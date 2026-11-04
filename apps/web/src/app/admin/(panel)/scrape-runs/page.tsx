@@ -9,6 +9,7 @@ import {
   button,
   fmtDateTime,
   type Tone,
+  TableScroll,
 } from '@/components/admin/ui';
 import { adminApi, can, guard } from '@/lib/admin';
 import { runScrapeNow } from '../../actions';
@@ -58,7 +59,7 @@ export default async function RunsAdmin({
       />
       <Flash ok={sp.ok} err={sp.err} />
       <Card padded={false}>
-        <div className="overflow-x-auto">
+        <TableScroll label="Scrape runs table">
           <table className="w-full min-w-[820px]">
             <caption className="sr-only">Scrape runs</caption>
             <thead className="bg-slate-50">
@@ -120,7 +121,7 @@ export default async function RunsAdmin({
             </tbody>
           </table>
           {data.items.length === 0 && <Empty>No runs yet.</Empty>}
-        </div>
+        </TableScroll>
       </Card>
     </>
   );

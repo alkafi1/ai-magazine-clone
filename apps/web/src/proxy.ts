@@ -14,9 +14,12 @@ type SiteCfg = {
 let cached: { at: number; cfg: SiteCfg } | null = null;
 
 async function siteCfg(): Promise<SiteCfg | null> {
-  if (cached && Date.now() - cached.at < 60_000) return cached.cfg;
+  if (cached && Date.now() - cached.at < 10_000) return cached.cfg;
   try {
-    const res = await fetch(`${API}/api/site-config`, { signal: AbortSignal.timeout(800) });
+    const res = await fetch(`${API}/api/site-config`, {
+      headers: { 'x-internal-secret': process.env.REVALIDATE_SECRET ?? '' },
+      signal: AbortSignal.timeout(800),
+    });
     if (res.ok) {
       cached = { at: Date.now(), cfg: (await res.json()) as SiteCfg };
       return cached.cfg;
@@ -102,6 +105,7 @@ export async function proxy(req: NextRequest) {
       try {
         const r = await fetch(`${API}/api/articles/${slug}`, {
           method: 'HEAD',
+          headers: { 'x-internal-secret': process.env.REVALIDATE_SECRET ?? '' },
           signal: AbortSignal.timeout(1500),
         });
         if (r.status === 410)

@@ -103,7 +103,8 @@ MongoDB is **not** published to the host. The site listens on `HTTP_PORT` (defau
 ## 6. Create the admin user and the first content
 
 ```bash
-# 12+ character password; this is the login for https://example.com/admin
+# 12+ character password; this makes a SUPER ADMIN and is the login for https://example.com/admin.
+# Create everyone else (editors, moderators, ad managers...) from the admin: Users & roles.
 docker compose exec api node dist/db/create-admin.js you@example.com 'a-long-unique-password'
 
 # Backfill. ~1.75 s per article by design (polite crawling): 400 articles take about 12 minutes.
@@ -129,6 +130,17 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST https://example.com/api/revalid
 - (YOU) Run <https://pagespeed.web.dev/> and Google's Rich Results Test
   (<https://search.google.com/test/rich-results>) on a few article URLs.
 - Ask a friend to try a taken-down story: hide an article in the admin, then `curl -I` its URL: **410**.
+
+## 7b. Ads and analytics (YOU, optional)
+
+1. Create an AdSense account and get the site approved (<https://adsense.google.com>); this needs real content and a live
+   domain, so do it after launch. Create ad units and note the **publisher ID** (`ca-pub-…`) and each unit's **slot ID**.
+2. Sign in at `/admin` -> **Ads**: turn ads on, paste the publisher ID, enable placements and fill in their slot IDs, save.
+   `https://example.com/ads.txt` is generated for you (check it). Keep "Ask for consent first" on.
+3. If you target the EU/UK/Switzerland, add a **Google-certified consent management platform**: the built-in cookie banner
+   is basic and does not satisfy Google's requirements for personalised ads there.
+4. Analytics: `/admin` -> **Site settings** -> GA4 measurement ID (`G-…`). It loads only after consent.
+5. Update your Privacy page to name the ad network and analytics you actually use.
 
 ## 8. Search engines (YOU)
 

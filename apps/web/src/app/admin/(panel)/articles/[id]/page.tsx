@@ -93,7 +93,7 @@ export default async function EditArticle({
           className="lg:col-span-2"
         >
           <form action={saveSeo} className="space-y-4">
-            <input type="hidden" name="id" value={a.id} />
+            <input type="hidden" name="target" value={a.id} />
             <Field
               label="Meta title"
               htmlFor="metaTitle"

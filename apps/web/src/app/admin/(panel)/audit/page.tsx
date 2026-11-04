@@ -11,6 +11,7 @@ import {
   fmtDateTime,
   inputCls,
   type Tone,
+  TableScroll,
 } from '@/components/admin/ui';
 import { adminApi, guard } from '@/lib/admin';
 
@@ -104,7 +105,7 @@ export default async function AuditAdmin({
             Reset
           </Link>
         </form>
-        <div className="overflow-x-auto">
+        <TableScroll label="Audit log table">
           <table className="w-full min-w-[820px]">
             <caption className="sr-only">Audit log</caption>
             <thead className="bg-slate-50">
@@ -135,7 +136,7 @@ export default async function AuditAdmin({
             </tbody>
           </table>
           {data.items.length === 0 && <Empty>No entries match.</Empty>}
-        </div>
+        </TableScroll>
         {pages > 1 && (
           <nav
             aria-label="Pagination"

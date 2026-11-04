@@ -75,9 +75,15 @@ await Article.create([
   }),
 ]);
 
-await AdminUser.create({
-  email: 'admin@e2e.test',
-  passwordHash: await bcrypt.hash('e2e-password-12345', 10),
-});
+const passwordHash = await bcrypt.hash('e2e-password-12345', 10);
+await AdminUser.create(
+  (['super_admin', 'editor', 'moderator', 'ad_manager', 'viewer'] as const).map((role) => ({
+    email: role === 'super_admin' ? 'admin@e2e.test' : `${role}@e2e.test`,
+    name: role.replace('_', ' '),
+    role,
+    passwordHash,
+  })),
+);
+await AdminUser.create({ email: 'lockme@e2e.test', role: 'viewer', passwordHash }); // used by the lockout test
 console.log('e2e data seeded');
 await disconnectDb();

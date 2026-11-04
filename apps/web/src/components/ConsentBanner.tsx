@@ -31,7 +31,7 @@ export function ConsentBanner({ needed }: { needed: boolean }) {
           </button>
           <button
             onClick={() => setConsent('granted')}
-            className="rounded-md bg-wire px-4 py-2 text-sm font-semibold text-white hover:bg-wire-dark"
+            className="rounded-md bg-wire px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
           >
             Accept
           </button>

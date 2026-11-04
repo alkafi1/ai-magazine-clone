@@ -69,7 +69,7 @@ const flag = z.enum(['true', 'false']).transform((v) => v === 'true');
 const BACK_ARTICLES = '/admin/articles';
 
 export async function setHidden(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   const value = flag.parse(formData.get('value'));
   await act(
     String(formData.get('back') || BACK_ARTICLES),
@@ -85,7 +85,7 @@ export async function setHidden(formData: FormData) {
 }
 
 export async function setFeatured(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   const value = flag.parse(formData.get('value'));
   await act(
     String(formData.get('back') || BACK_ARTICLES),
@@ -101,7 +101,7 @@ export async function setFeatured(formData: FormData) {
 }
 
 export async function takedown(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   await act(
     String(formData.get('back') || BACK_ARTICLES),
     'Story taken down (it now returns 410).',
@@ -127,7 +127,7 @@ export async function bulkArticles(formData: FormData) {
 
 const emptyToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
 const seoSchema = z.object({
-  id: idSchema,
+  target: idSchema,
   metaTitle: z.preprocess(emptyToNull, z.string().max(70).nullable()),
   metaDescription: z.preprocess(emptyToNull, z.string().max(200).nullable()),
   ogImage: z.preprocess(emptyToNull, z.string().url().nullable()),
@@ -136,12 +136,12 @@ const seoSchema = z.object({
 
 export async function saveSeo(formData: FormData) {
   const parsed = seoSchema.safeParse(Object.fromEntries(formData));
-  const id = String(formData.get('id') ?? '');
+  const id = String(formData.get('target') ?? '');
   if (!parsed.success)
     redirect(
       `/admin/articles/${id}?err=${encodeURIComponent('Check the values: title up to 70 characters, description up to 200, image must be a full https URL.')}`,
     );
-  const { id: articleId, ...seo } = parsed.data;
+  const { target: articleId, ...seo } = parsed.data;
   await act(
     `/admin/articles/${articleId}`,
     'SEO settings saved. The public page refreshes shortly.',
@@ -163,7 +163,7 @@ export async function runScrapeNow() {
 
 // ---- subscribers -----------------------------------------------------------------------------
 export async function deleteSubscriber(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   await act(String(formData.get('back') || '/admin/subscribers'), 'Subscriber removed.', () =>
     adminApi(`/subscribers/${id}`, { method: 'DELETE' }),
   );
@@ -245,7 +245,7 @@ export async function createUser(formData: FormData) {
 }
 
 export async function updateUser(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   const body: Record<string, unknown> = {};
   const role = text(formData, 'role');
   if (role) body.role = role;
@@ -258,7 +258,7 @@ export async function updateUser(formData: FormData) {
 }
 
 export async function resetUserPassword(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   await act('/admin/users', 'Password reset. The user has been signed out everywhere.', () =>
     adminApi(`/users/${id}/reset-password`, {
       method: 'POST',
@@ -268,7 +268,7 @@ export async function resetUserPassword(formData: FormData) {
 }
 
 export async function deleteUser(formData: FormData) {
-  const id = idSchema.parse(formData.get('id'));
+  const id = idSchema.parse(formData.get('target'));
   await act('/admin/users', 'Account deleted.', () =>
     adminApi(`/users/${id}`, { method: 'DELETE' }),
   );

@@ -34,14 +34,24 @@ export async function adminApi<T>(path: string, init: RequestInit = {}): Promise
     headers: {
       ...init.headers,
       Authorization: `Bearer ${token}`,
+      'x-internal-secret': process.env.REVALIDATE_SECRET ?? '',
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     },
   });
   if (res.status === 401) redirect('/admin/login?expired=1');
   if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new AdminApiError(res.status, (body as { error?: string }).error ?? `API ${res.status}`);
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    issues?: { path: string; message: string }[];
+  };
+  if (!res.ok) {
+    // Surface the API's field-level validation messages, e.g. "adsenseClientId: looks like ca-pub-...".
+    const detail = body.issues
+      ?.slice(0, 3)
+      .map((i) => (i.path ? `${i.path}: ${i.message}` : i.message))
+      .join('; ');
+    throw new AdminApiError(res.status, detail || body.error || `API ${res.status}`);
+  }
   return body as T;
 }
 
@@ -53,7 +63,11 @@ export async function adminLogin(
   const res = await fetch(`${API}/api/admin/login`, {
     method: 'POST',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...(ip ? { 'X-Forwarded-For': ip } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-internal-secret': process.env.REVALIDATE_SECRET ?? '',
+      ...(ip ? { 'X-Forwarded-For': ip } : {}),
+    },
     body: JSON.stringify({ email, password }),
   });
   if (res.status === 429) throw new AdminApiError(429, 'Too many attempts. Try again later.');

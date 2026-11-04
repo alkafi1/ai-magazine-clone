@@ -56,6 +56,13 @@ export const requirePermission =
     next();
   };
 
+/** True when the request carries the shared secret: it comes from our own web server, not a visitor. */
+export function isInternal(req: Request): boolean {
+  const a = Buffer.from(req.header('x-internal-secret') ?? '');
+  const b = Buffer.from(config.revalidateSecret);
+  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
+}
+
 /** Shared-secret guard for server-to-server calls (e.g. revalidate). */
 export function requireSecret(header: string, secret: string) {
   return (req: Request, _res: Response, next: NextFunction) => {

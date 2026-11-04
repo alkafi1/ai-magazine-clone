@@ -11,6 +11,7 @@ import {
   button,
   fmtDateTime,
   inputCls,
+  TableScroll,
 } from '@/components/admin/ui';
 import { adminApi, can, guard } from '@/lib/admin';
 import { deleteSubscriber } from '../../actions';
@@ -73,7 +74,7 @@ export default async function Subscribers({
           </div>
           <button className={button('primary')}>Search</button>
         </form>
-        <div className="overflow-x-auto">
+        <TableScroll label="Subscribers table">
           <table className="w-full">
             <caption className="sr-only">Newsletter subscribers</caption>
             <thead className="bg-slate-50">
@@ -91,7 +92,7 @@ export default async function Subscribers({
                   {manage && (
                     <Td className="text-right">
                       <form action={deleteSubscriber}>
-                        <input type="hidden" name="id" value={s.id} />
+                        <input type="hidden" name="target" value={s.id} />
                         <input type="hidden" name="back" value={link(q.page)} />
                         <ConfirmButton
                           label="Remove"
@@ -109,7 +110,7 @@ export default async function Subscribers({
             </tbody>
           </table>
           {data.items.length === 0 && <Empty>No subscribers found.</Empty>}
-        </div>
+        </TableScroll>
         {pages > 1 && (
           <nav
             aria-label="Pagination"

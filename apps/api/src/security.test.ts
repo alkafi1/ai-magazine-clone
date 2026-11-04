@@ -57,6 +57,22 @@ describe('scraper only talks to the source host', () => {
   });
 });
 
+describe('rate limiting', () => {
+  it('limits visitors per IP, but never our own web server (shared secret)', async () => {
+    const { config } = await import('./config/index.js');
+    const limited = createApp({ globalMax: 3, loginMax: 1000, newsletterMax: 1000 });
+    for (let i = 0; i < 3; i++) await request(limited).get('/api/nope').expect(404);
+    await request(limited).get('/api/nope').expect(429); // a visitor is throttled
+    for (let i = 0; i < 10; i++) {
+      await request(limited)
+        .get('/api/nope')
+        .set('x-internal-secret', config.revalidateSecret)
+        .expect(404);
+    }
+    await request(limited).get('/api/nope').set('x-internal-secret', 'wrong-secret').expect(429); // a wrong secret buys nothing
+  });
+});
+
 describe('API input hardening', () => {
   const app = createApp({ loginMax: 1000, newsletterMax: 1000, globalMax: 10000 });
   beforeAll(() => connectDb('mongodb://localhost:27017/aimag_test_security'));

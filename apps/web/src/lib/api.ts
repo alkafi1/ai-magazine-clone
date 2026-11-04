@@ -11,7 +11,10 @@ const REVALIDATE = 300;
 
 /** GET from the API with ISR + cache tags. Returns null for 404/410; throws on other errors. */
 async function get<T>(path: string, tags: string[], revalidate = REVALIDATE): Promise<T | null> {
-  const res = await fetch(`${API}${path}`, { next: { revalidate, tags } });
+  const res = await fetch(`${API}${path}`, {
+    headers: { 'x-internal-secret': process.env.REVALIDATE_SECRET ?? '' },
+    next: { revalidate, tags },
+  });
   if (res.status === 404 || res.status === 410) return null;
   if (!res.ok) throw new Error(`API ${res.status} for ${path}`);
   return (await res.json()) as T;

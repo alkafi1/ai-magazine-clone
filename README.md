@@ -86,13 +86,61 @@ pnpm --filter @aimag/web build && pnpm --filter @aimag/web start
 
 ### Admin panel
 
-`http://localhost:3100/admin` (create a user first: `pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'`).
-Dashboard stats, article moderation (search, filter, feature, hide/restore, takedown, per-article SEO overrides and
-noindex), and scrape runs (history, per-run errors, **Run now**). Sign-in stores the API's JWT in an
-`httpOnly`, `SameSite=Strict` cookie scoped to `/admin` (12h), so page scripts never see it; `proxy.ts` redirects
-visitors without the cookie and every API call re-verifies the token (401 -> back to login). Admin pages are
-`noindex`, `no-store` and disallowed in robots.txt. Behind a reverse proxy, make it set `X-Forwarded-For` to the
-real client IP so the API's login rate limit (10 tries / 15 min / IP) is per visitor.
+`http://localhost:3100/admin`. Create the first account (a **super admin**) with
+`pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'`; add everyone else from **Users & roles**.
+
+| Area          | What it does                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| Dashboard     | KPIs, stories-per-day chart, scrape-run health strip, "attention needed" alerts                       |
+| Articles      | Search/filter, **bulk** feature/hide/restore, takedown (with confirmation), per-article SEO overrides |
+| Scrape runs   | History, errors, source-format warnings, **Run now**                                                  |
+| Subscribers   | Search, delete, **CSV export** (formula-injection safe, audited)                                      |
+| Ads           | AdSense or any network, 5 placements, consent, `ads.txt`, CSP hosts                                   |
+| Site settings | Announcement bar, social links, GA4, feature toggles, footer note                                     |
+| Users & roles | Create / change role / disable / unlock / reset password / delete; permission matrix                  |
+| Audit log     | Who did what, when, from which IP (sign-ins, user and settings changes, exports, takedowns)           |
+| My account    | Display name, change password (signs out other sessions)                                              |
+
+**Roles (RBAC).** Permissions, not role names, are checked everywhere (`packages/shared/src/rbac.ts`); the API enforces them
+and the UI only hides what you cannot use.
+
+| Role        | Can do                                                          |
+| ----------- | --------------------------------------------------------------- |
+| Super admin | Everything, incl. managing other super admins                   |
+| Admin       | Everything except managing super admins; can create lower roles |
+| Editor      | Feature stories, edit SEO, view runs                            |
+| Moderator   | Hide / restore / take down stories, view runs                   |
+| Ad manager  | Dashboard + Ads                                                 |
+| Viewer      | Read-only dashboard, articles, runs                             |
+
+Rules: you can only create/edit accounts **below** your own role and hand out roles below yours; you cannot change your own
+role or disable/delete yourself; a super admin always exists. Role, disable and password changes take effect on the user's
+**very next request** (the token is checked against the database every time). 5 wrong passwords lock an account for
+15 minutes (silently: same generic error, no account enumeration); an admin can unlock it. Everything is in the audit log.
+Sign-in stores the JWT in an `httpOnly`, `SameSite=Strict` cookie scoped to `/admin` (12 h). Behind a reverse proxy, make it
+set `X-Forwarded-For` to the real client IP so rate limits are per visitor.
+
+### Ads, consent and analytics
+
+Admin → **Ads**: turn ads on, choose **Google AdSense** (publisher ID `ca-pub-…` + ad-unit slot IDs) or **other network**
+(paste its ad code), then enable the placements you want: header banner, in-feed (every N stories), sidebar, article top,
+article bottom. Optional **Auto ads**. Other networks' domains go in "Allowed ad domains" and are added to the
+Content-Security-Policy at request time; Google's are added automatically. `/ads.txt` is generated from your publisher ID and any extra lines.
+
+- Ads and GA4 load **only after the visitor accepts** the cookie banner (default; "Ask for consent first"). Decline = no ad or
+  analytics scripts at all; a footer "Cookie settings" link lets people change their mind. Ads never render in the admin.
+- The built-in banner is basic. Google requires a **certified consent platform** for personalised ads to EU/UK/CH visitors:
+  add one before targeting those regions, or leave AdSense on non-personalised ads in your AdSense account.
+- You need your own AdSense account and an approved site: that is outside this repo.
+- Ad slots render nothing on the server (cached pages never depend on consent) and appear after hydration, so the first
+  paint has no ad space reserved. Pasted "other network" code runs in visitors' browsers: only use networks you trust
+  (only users with the Ads permission can set it).
+
+### Other site features
+
+Dark mode (toggle in the header, saved in the browser, no flash), announcement bar (breaking/notice/info, optional expiry),
+`/topics` index, an RSS feed **per category** (`/category/<slug>/feed.xml`), copy-link on articles, social links and footer
+note, and a switch to hide the newsletter form. All are controlled from the admin without a redeploy.
 
 ### Images and Lighthouse (decision needed)
 

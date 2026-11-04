@@ -13,6 +13,7 @@ import {
   button,
   fmtRelative,
   inputCls,
+  TableScroll,
 } from '@/components/admin/ui';
 import { adminApi, can, guard } from '@/lib/admin';
 import { bulkArticles, setFeatured, setHidden, takedown } from '../../actions';
@@ -169,7 +170,7 @@ export default async function ArticlesAdmin({
           </form>
         )}
 
-        <div className="overflow-x-auto">
+        <TableScroll label="Articles table">
           <table className="w-full min-w-[760px]">
             <caption className="sr-only">Articles</caption>
             <thead className="bg-slate-50">
@@ -248,7 +249,7 @@ export default async function ArticlesAdmin({
                       <div className="flex flex-wrap gap-1.5">
                         {canFeature && !a.isHidden && (
                           <form action={setFeatured}>
-                            <input type="hidden" name="id" value={a.id} />
+                            <input type="hidden" name="target" value={a.id} />
                             <input type="hidden" name="back" value={back} />
                             <input type="hidden" name="value" value={String(!a.isFeatured)} />
                             <button className={button('secondary', true)}>
@@ -258,7 +259,7 @@ export default async function ArticlesAdmin({
                         )}
                         {canModerate && (
                           <form action={setHidden}>
-                            <input type="hidden" name="id" value={a.id} />
+                            <input type="hidden" name="target" value={a.id} />
                             <input type="hidden" name="back" value={back} />
                             <input type="hidden" name="value" value={String(!a.isHidden)} />
                             <button className={button('secondary', true)}>
@@ -268,7 +269,7 @@ export default async function ArticlesAdmin({
                         )}
                         {canModerate && !a.isHidden && (
                           <form action={takedown}>
-                            <input type="hidden" name="id" value={a.id} />
+                            <input type="hidden" name="target" value={a.id} />
                             <input type="hidden" name="back" value={back} />
                             <ConfirmButton
                               label="Takedown"
@@ -288,7 +289,7 @@ export default async function ArticlesAdmin({
             </tbody>
           </table>
           {data.items.length === 0 && <Empty>No stories match these filters.</Empty>}
-        </div>
+        </TableScroll>
 
         {pages > 1 && (
           <nav

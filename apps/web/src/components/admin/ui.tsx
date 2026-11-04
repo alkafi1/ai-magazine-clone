@@ -13,7 +13,7 @@ export const button = (kind: keyof Omit<typeof btn, 'base' | 'small'>, small = f
   `${btn.base} ${btn[kind]} ${small ? btn.small : ''}`;
 
 export const inputCls =
-  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-wire focus:outline-none focus:ring-2 focus:ring-wire/30 disabled:bg-slate-100';
+  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-wire focus:outline-none focus:ring-2 focus:ring-wire/30 disabled:bg-slate-100';
 
 export function PageHeader({
   title,
@@ -179,3 +179,17 @@ export const fmtRelative = (iso: string | Date | null | undefined) => {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return `${Math.floor(s / 86400)} d ago`;
 };
+
+/** Horizontally scrollable table area. tabIndex + region role make it usable with a keyboard (WCAG 2.1.1). */
+export function TableScroll({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+      className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-wire"
+    >
+      {children}
+    </div>
+  );
+}

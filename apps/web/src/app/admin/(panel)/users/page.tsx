@@ -21,6 +21,7 @@ import {
   fmtRelative,
   inputCls,
   type Tone,
+  TableScroll,
 } from '@/components/admin/ui';
 import { adminApi, can, guard } from '@/lib/admin';
 import { createUser, deleteUser, resetUserPassword, updateUser } from '../../actions';
@@ -79,7 +80,7 @@ export default async function UsersAdmin({
       <Flash ok={sp.ok} err={sp.err} />
 
       <Card padded={false} title={`${items.length} account${items.length === 1 ? '' : 's'}`}>
-        <div className="overflow-x-auto">
+        <TableScroll label="Admin accounts">
           <table className="w-full min-w-[820px]">
             <caption className="sr-only">Admin accounts</caption>
             <thead className="bg-slate-50">
@@ -126,7 +127,7 @@ export default async function UsersAdmin({
                             </summary>
                             <div className="mt-3 w-72 space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                               <form action={updateUser} className="space-y-2">
-                                <input type="hidden" name="id" value={u.id} />
+                                <input type="hidden" name="target" value={u.id} />
                                 <label
                                   htmlFor={`role-${u.id}`}
                                   className="text-xs font-medium text-slate-700"
@@ -149,7 +150,7 @@ export default async function UsersAdmin({
                               </form>
                               <div className="flex flex-wrap gap-2">
                                 <form action={updateUser}>
-                                  <input type="hidden" name="id" value={u.id} />
+                                  <input type="hidden" name="target" value={u.id} />
                                   <input type="hidden" name="active" value={String(!u.active)} />
                                   <button className={button('secondary', true)}>
                                     {u.active ? 'Disable' : 'Enable'}
@@ -157,14 +158,14 @@ export default async function UsersAdmin({
                                 </form>
                                 {u.locked && (
                                   <form action={updateUser}>
-                                    <input type="hidden" name="id" value={u.id} />
+                                    <input type="hidden" name="target" value={u.id} />
                                     <input type="hidden" name="unlock" value="true" />
                                     <button className={button('secondary', true)}>Unlock</button>
                                   </form>
                                 )}
                               </div>
                               <form action={resetUserPassword} className="space-y-2">
-                                <input type="hidden" name="id" value={u.id} />
+                                <input type="hidden" name="target" value={u.id} />
                                 <label
                                   htmlFor={`pw-${u.id}`}
                                   className="text-xs font-medium text-slate-700"
@@ -185,7 +186,7 @@ export default async function UsersAdmin({
                                 </button>
                               </form>
                               <form action={deleteUser}>
-                                <input type="hidden" name="id" value={u.id} />
+                                <input type="hidden" name="target" value={u.id} />
                                 <ConfirmButton
                                   label="Delete account"
                                   title={`Delete ${u.email}?`}
@@ -198,7 +199,7 @@ export default async function UsersAdmin({
                             </div>
                           </details>
                         ) : (
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-slate-500">
                             {isMe ? 'Use My account' : '—'}
                           </span>
                         )}
@@ -209,7 +210,7 @@ export default async function UsersAdmin({
               })}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </Card>
 
       {manage && (
@@ -262,7 +263,7 @@ export default async function UsersAdmin({
         className="mt-6"
         padded={false}
       >
-        <div className="overflow-x-auto">
+        <TableScroll label="Permissions by role">
           <table className="w-full min-w-[720px] text-sm">
             <caption className="sr-only">Permissions by role</caption>
             <thead className="bg-slate-50">
@@ -296,7 +297,7 @@ export default async function UsersAdmin({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         <ul className="grid gap-2 border-t border-slate-100 p-5 text-sm text-slate-600 md:grid-cols-2">
           {ROLES.map((r) => (
             <li key={r}>

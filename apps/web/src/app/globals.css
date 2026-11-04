@@ -62,10 +62,9 @@ body {
   --color-card: #131a2e;
   --color-mist: #263049;
   --color-slate: #a3aec4;
+  /* links use wire-dark as TEXT colour; a lighter violet keeps them readable on the dark page */
+  --color-wire-dark: #b9adff;
   color-scheme: dark;
-}
-.dark .text-wire-dark {
-  color: #b9adff;
 }
 /* Admin stays light even if the visitor chose dark mode on the public site. */
 .force-light {

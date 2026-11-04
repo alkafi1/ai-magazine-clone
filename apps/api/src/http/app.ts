@@ -3,6 +3,7 @@ import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/index.js';
+import { isInternal } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { adminRouter } from './routes/admin.js';
 import { publicRouter } from './routes/public.js';
@@ -31,6 +32,9 @@ export function createApp(opts: AppOptions = {}) {
   app.use(
     '/api',
     rateLimit({
+      // Our own web server makes every page's API calls from ONE address; limiting it would throttle the
+      // whole site. Visitors' direct calls (newsletter, view beacon) are still limited per IP.
+      skip: isInternal,
       windowMs: 60_000,
       limit: opts.globalMax ?? 300,
       standardHeaders: 'draft-7',
@@ -39,7 +43,7 @@ export function createApp(opts: AppOptions = {}) {
   );
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
-  app.use('/api/admin', adminRouter({ loginMax: opts.loginMax ?? 10 }));
+  app.use('/api/admin', adminRouter({ loginMax: opts.loginMax ?? config.loginRateLimitMax }));
   app.use('/api', publicRouter({ newsletterMax: opts.newsletterMax ?? 5 }));
 
   app.use(notFound);
