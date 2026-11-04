@@ -1,15 +1,24 @@
 import { timingSafeEqual } from 'node:crypto';
-import { can, isRole, type Permission, type Role } from '@aimag/shared';
+import type { Permission } from '@aimag/shared';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config/index.js';
+import { resolveRole } from '../../db/roles.js';
 import { AdminUser } from '../../models/index.js';
 import { HttpError } from './error.js';
 
 /** JWT payload. Role is deliberately NOT in the token: it is read from the database on every request. */
 type TokenPayload = { sub: string; tv: number };
 
-export type Admin = { id: string; email: string; name: string; role: Role };
+export type Admin = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  roleName: string;
+  rank: number;
+  permissions: Permission[];
+};
 
 export const signAdminToken = (user: { id: string; tokenVersion: number }) =>
   jwt.sign({ sub: user.id, tv: user.tokenVersion } satisfies TokenPayload, config.jwtSecret, {
@@ -33,14 +42,19 @@ export async function requireAdmin(req: Request, _res: Response, next: NextFunct
   const user = await AdminUser.findById(payload.sub)
     .lean()
     .catch(() => null);
-  if (!user || !user.active || user.tokenVersion !== payload.tv || !isRole(user.role)) {
+  if (!user || !user.active || user.tokenVersion !== payload.tv)
     return next(new HttpError(401, 'unauthorized'));
-  }
+  // Role (and its permissions) is resolved fresh each request: edits to a role apply immediately.
+  const role = await resolveRole(user.role);
+  if (!role) return next(new HttpError(401, 'unauthorized'));
   (req as Request & { admin?: Admin }).admin = {
     id: String(user._id),
     email: user.email,
     name: user.name ?? '',
-    role: user.role,
+    role: role.key,
+    roleName: role.name,
+    rank: role.rank,
+    permissions: role.permissions,
   };
   next();
 }
@@ -51,8 +65,8 @@ export const adminOf = (req: Request) => (req as Request & { admin?: Admin }).ad
 export const requirePermission =
   (...permissions: Permission[]) =>
   (req: Request, _res: Response, next: NextFunction) => {
-    const { role } = adminOf(req);
-    if (!permissions.every((p) => can(role, p))) return next(new HttpError(403, 'forbidden'));
+    const { permissions: held } = adminOf(req);
+    if (!permissions.every((p) => held.includes(p))) return next(new HttpError(403, 'forbidden'));
     next();
   };
 

@@ -1,8 +1,10 @@
-import { ROLE_PERMISSIONS, assignableRoles, can, type Permission } from '@aimag/shared';
+import type { Permission } from '@aimag/shared';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { allRoles } from '../../db/roles.js';
+import { outranks } from '@aimag/shared';
 import { startRun } from '../../scheduler/index.js';
 import { revalidateWeb } from '../../scheduler/revalidate.js';
 import {
@@ -20,6 +22,7 @@ import { clearCache } from '../middleware/cache.js';
 import { HttpError, parse } from '../middleware/error.js';
 import { limit, objectId, page } from '../validators.js';
 import { adminMiscRouter } from './admin-misc.js';
+import { adminRolesRouter } from './admin-roles.js';
 import { adminUsersRouter } from './admin-users.js';
 
 // A real hash to compare against when the user does not exist, so timing doesn't reveal accounts.
@@ -46,7 +49,7 @@ const patchBody = z
 
 /** 403 unless the signed-in admin's role grants `permission`. For checks that depend on the request body. */
 function need(req: Parameters<typeof adminOf>[0], permission: Permission) {
-  if (!can(adminOf(req).role, permission)) throw new HttpError(403, 'forbidden');
+  if (!adminOf(req).permissions.includes(permission)) throw new HttpError(403, 'forbidden');
 }
 
 export function adminRouter(opts: { loginMax: number }) {
@@ -110,12 +113,14 @@ export function adminRouter(opts: { loginMax: number }) {
   r.use(requireAdmin);
 
   // ---- who am I / change own password -------------------------------------------------------
-  r.get('/me', (req, res) => {
+  r.get('/me', async (req, res) => {
     const me = adminOf(req);
+    const roles = await allRoles();
     res.json({
       ...me,
-      permissions: ROLE_PERMISSIONS[me.role],
-      assignableRoles: assignableRoles(me.role),
+      assignableRoles: roles
+        .filter((r) => outranks(me, r.rank))
+        .map(({ key, name, rank }) => ({ key, name, rank })),
     });
   });
 
@@ -146,6 +151,7 @@ export function adminRouter(opts: { loginMax: number }) {
   });
 
   r.use('/users', adminUsersRouter());
+  r.use('/roles', adminRolesRouter());
   r.use(adminMiscRouter());
 
   // ---- articles -----------------------------------------------------------------------------

@@ -1,7 +1,8 @@
-import { ROLES, ROLE_RANK, assignableRoles, canManageRole, isRole, type Role } from '@aimag/shared';
+import { outranks } from '@aimag/shared';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
+import { allRoles, resolveRole } from '../../db/roles.js';
 import { AdminUser } from '../../models/index.js';
 import { audit } from '../audit.js';
 import { adminOf, requirePermission } from '../middleware/auth.js';
@@ -9,22 +10,26 @@ import { HttpError, parse } from '../middleware/error.js';
 import { objectId } from '../validators.js';
 
 const password = z.string().min(12, 'at least 12 characters').max(200);
-const roleSchema = z.enum(ROLES);
+const roleKey = z.string().trim().min(1).max(40);
 
-const view = (u: {
-  _id: unknown;
-  email: string;
-  name?: string | null;
-  role: string;
-  active: boolean;
-  lastLoginAt?: Date | null;
-  lockedUntil?: Date | null;
-  createdAt?: Date;
-}) => ({
+const view = (
+  u: {
+    _id: unknown;
+    email: string;
+    name?: string | null;
+    role: string;
+    active: boolean;
+    lastLoginAt?: Date | null;
+    lockedUntil?: Date | null;
+    createdAt?: Date;
+  },
+  roleName: string,
+) => ({
   id: String(u._id),
   email: u.email,
   name: u.name ?? '',
   role: u.role,
+  roleName,
   active: u.active,
   locked: !!u.lockedUntil && u.lockedUntil > new Date(),
   lastLoginAt: u.lastLoginAt ?? null,
@@ -47,8 +52,12 @@ export function adminUsersRouter() {
   const r = Router();
 
   r.get('/', requirePermission('users.view'), async (_req, res) => {
-    const users = await AdminUser.find().sort({ createdAt: 1, _id: 1 }).lean();
-    res.json({ items: users.map(view) });
+    const [users, roles] = await Promise.all([
+      AdminUser.find().sort({ createdAt: 1, _id: 1 }).lean(),
+      allRoles(),
+    ]);
+    const names = new Map(roles.map((x) => [x.key, x.name]));
+    res.json({ items: users.map((u) => view(u, names.get(u.role) ?? `${u.role} (missing)`)) });
   });
 
   r.post('/', requirePermission('users.manage'), async (req, res) => {
@@ -57,25 +66,26 @@ export function adminUsersRouter() {
       z.object({
         email: z.string().trim().toLowerCase().email().max(254),
         name: z.string().trim().max(100).default(''),
-        role: roleSchema,
+        role: roleKey,
         password,
       }),
       req.body,
     );
-    if (!assignableRoles(actor.role).includes(body.role)) {
+    const role = await resolveRole(body.role);
+    if (!role) throw new HttpError(400, 'unknown role');
+    if (!outranks(actor, role.rank))
       throw new HttpError(403, 'you cannot create an account with that role');
-    }
     try {
       const user = await AdminUser.create({
         email: body.email,
         name: body.name,
-        role: body.role,
+        role: role.key,
         passwordHash: await bcrypt.hash(body.password, 12),
         passwordChangedAt: new Date(),
         createdBy: actor.id,
       });
-      await audit(req, 'user.create', body.email, { role: body.role });
-      res.status(201).json(view(user));
+      await audit(req, 'user.create', body.email, { role: role.key });
+      res.status(201).json(view(user, role.name));
     } catch (err) {
       if ((err as { code?: number }).code === 11000)
         throw new HttpError(409, 'an account with that email exists');
@@ -90,7 +100,7 @@ export function adminUsersRouter() {
       z
         .object({
           name: z.string().trim().max(100),
-          role: roleSchema,
+          role: roleKey,
           active: z.boolean(),
           unlock: z.literal(true),
         })
@@ -103,11 +113,16 @@ export function adminUsersRouter() {
     if (String(target._id) === actor.id && (body.role !== undefined || body.active !== undefined)) {
       throw new HttpError(400, 'you cannot change your own role or disable yourself');
     }
-    if (!isRole(target.role) || !canManageRole(actor.role, target.role)) {
+    const current = await resolveRole(target.role);
+    if (!current || !outranks(actor, current.rank))
       throw new HttpError(403, 'you cannot manage this account');
-    }
-    if (body.role !== undefined && !assignableRoles(actor.role).includes(body.role)) {
-      throw new HttpError(403, 'you cannot assign that role');
+
+    let next = current;
+    if (body.role !== undefined) {
+      const wanted = await resolveRole(body.role);
+      if (!wanted) throw new HttpError(400, 'unknown role');
+      if (!outranks(actor, wanted.rank)) throw new HttpError(403, 'you cannot assign that role');
+      next = wanted;
     }
     const demoting = body.role !== undefined && body.role !== 'super_admin';
     const disabling = body.active === false;
@@ -134,7 +149,7 @@ export function adminUsersRouter() {
     }
     await target.save();
     await audit(req, 'user.update', target.email, changes);
-    res.json(view(target));
+    res.json(view(target, next.name));
   });
 
   r.post('/:id/reset-password', requirePermission('users.manage'), async (req, res) => {
@@ -145,9 +160,9 @@ export function adminUsersRouter() {
     if (!target) throw new HttpError(404, 'not found');
     if (String(target._id) === actor.id)
       throw new HttpError(400, 'change your own password from My account');
-    if (!isRole(target.role) || !canManageRole(actor.role, target.role)) {
+    const role = await resolveRole(target.role);
+    if (!role || !outranks(actor, role.rank))
       throw new HttpError(403, 'you cannot manage this account');
-    }
     target.passwordHash = await bcrypt.hash(body.password, 12);
     target.passwordChangedAt = new Date();
     target.tokenVersion += 1; // signs them out everywhere
@@ -165,17 +180,14 @@ export function adminUsersRouter() {
     if (!target) throw new HttpError(404, 'not found');
     if (String(target._id) === actor.id)
       throw new HttpError(400, 'you cannot delete your own account');
-    if (!isRole(target.role) || !canManageRole(actor.role, target.role)) {
+    const role = await resolveRole(target.role);
+    if (!role || !outranks(actor, role.rank))
       throw new HttpError(403, 'you cannot manage this account');
-    }
     if (await wouldRemoveLastSuperAdmin(target)) {
       throw new HttpError(400, 'there must always be at least one active super admin');
     }
     await target.deleteOne();
-    await audit(req, 'user.delete', target.email, {
-      role: target.role as Role,
-      rank: ROLE_RANK[target.role as Role],
-    });
+    await audit(req, 'user.delete', target.email, { role: target.role, rank: role.rank });
     res.status(204).end();
   });
 

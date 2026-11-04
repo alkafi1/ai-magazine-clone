@@ -1,4 +1,3 @@
-import { ROLES } from '@aimag/shared';
 import { Schema, model } from 'mongoose';
 
 const adminUserSchema = new Schema(
@@ -6,7 +5,8 @@ const adminUserSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true },
     name: { type: String, default: '' },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ROLES, default: 'viewer' },
+    // Built-in role key (super_admin, editor, ...) or the key of a custom Role document.
+    role: { type: String, required: true, default: 'viewer' },
     /** Disabled accounts cannot sign in and their existing sessions stop working immediately. */
     active: { type: Boolean, default: true },
     /** Bumped on password change, role change and disable: invalidates every token issued before. */
