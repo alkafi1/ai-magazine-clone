@@ -11,6 +11,8 @@ export type RunOptions = {
   limit?: number;
   /** 'YYYY-MM': backfill every monthly sitemap from this month. */
   since?: string;
+  /** Stop fetching (after the current page) when aborted, e.g. on shutdown. */
+  signal?: AbortSignal;
 };
 
 export type RunSummary = {
@@ -23,6 +25,7 @@ export type RunSummary = {
   failed: number;
   newSlugs: string[];
   categorySlugs: string[];
+  aborted: boolean;
 };
 
 /**
@@ -42,6 +45,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     failed: 0,
     newSlugs: [],
     categorySlugs: [],
+    aborted: false,
   };
   const logError = (e: {
     url?: string;
@@ -73,6 +77,11 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     );
 
     for (const entry of todo) {
+      if (opts.signal?.aborted) {
+        logger.warn('scrape aborted, stopping early');
+        s.aborted = true;
+        break;
+      }
       try {
         const { article } = await fetchArticle(fetcher, entry);
         const outcome = await upsertArticle(article, run._id);
@@ -99,7 +108,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
         }
       }
     }
-    if (s.status === 'success' && s.failed > 0)
+    if (s.status === 'success' && (s.failed > 0 || s.aborted))
       s.status = s.created + s.updated > 0 ? 'partial' : 'failed';
   } catch (err) {
     s.status = err instanceof BlockedError ? 'blocked' : 'failed';

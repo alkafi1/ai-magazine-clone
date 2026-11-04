@@ -42,6 +42,21 @@ pnpm --filter @aimag/shared build
 
 See [.env.example](.env.example); all are validated with zod in `apps/api/src/config`.
 
+## Scheduler
+
+`pnpm --filter @aimag/api dev` (or `start` after build) runs the API and the scheduler in one process.
+
+- Cron `SCHEDULER_CRON` (default `0 */6 * * *`); disable with `SCHEDULER_ENABLED=false`.
+- Overlap lock lives in MongoDB (`SiteSetting` key `lock:scrape`, 1h expiry), so a second trigger is skipped.
+- A run with status `failed` is retried (`SCHEDULER_RETRIES`, doubling delay). A `blocked` run is never retried.
+- On failure or block an alert is logged and POSTed to `ALERT_WEBHOOK_URL` (Slack/Discord-style `text` field).
+- After a run that changed anything, the API calls `POST {WEB_URL}/api/revalidate` with header
+  `x-revalidate-secret` (tags: `home`, `category:<slug>`, `article:<slug>`). Failures are only logged.
+- SIGINT/SIGTERM stops the cron, lets the current page finish, marks the run partial and exits.
+- Manual run: `curl -X POST -H "x-internal-secret: $REVALIDATE_SECRET" localhost:4000/api/internal/scrape-runs`
+  (returns 202; Phase 4 adds the JWT-protected admin equivalent).
+- The web app defaults to port 3100 because 3000 is commonly taken.
+
 ## Data model notes
 
 - Upsert key is `sourceUrl`; an article is only rewritten when `sourceHash` changes. Admin-controlled fields

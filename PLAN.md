@@ -350,10 +350,10 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 3: Scheduler (1 day)
 
-- [ ] Cron `0 */6 * * *`, overlap lock, graceful shutdown
-- [ ] Retry and failure alert (email or webhook)
-- [ ] Manual trigger endpoint
-- [ ] Revalidation call to Next.js after each run
+- [x] Cron `0 */6 * * *`, overlap lock, graceful shutdown
+- [x] Retry and failure alert (email or webhook)
+- [x] Manual trigger endpoint
+- [x] Revalidation call to Next.js after each run
 
 ### Phase 4: Backend API (3-4 days)
 

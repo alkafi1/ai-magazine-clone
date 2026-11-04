@@ -26,10 +26,12 @@ const sample = (over: Partial<ScrapedArticle> = {}): ScrapedArticle => ({
 
 beforeAll(async () => {
   await connectDb(TEST_URI);
-});
-beforeEach(async () => {
   await mongoose.connection.dropDatabase();
   await Promise.all(Object.values(mongoose.models).map((m) => m.init()));
+});
+beforeEach(async () => {
+  // Empty collections instead of dropping the DB: avoids rebuilding indexes for every test.
+  await Promise.all(Object.values(mongoose.models).map((m) => m.deleteMany({})));
 });
 afterAll(async () => {
   await mongoose.connection.dropDatabase();
