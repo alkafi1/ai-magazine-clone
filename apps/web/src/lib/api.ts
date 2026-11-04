@@ -135,4 +135,11 @@ export type CustomPage = {
   seo: { metaTitle: string | null; metaDescription: string | null; noindex: boolean };
   updatedAt: string;
 };
-export const getPage = (slug: string) => get<CustomPage>(`/api/pages/${slug}`, [`page:${slug}`]);
+/** A custom page, or null (no such page, or the API is unreachable, e.g. while building: callers then use built-in text). */
+export async function getPage(slug: string): Promise<CustomPage | null> {
+  try {
+    return await get<CustomPage>(`/api/pages/${slug}`, [`page:${slug}`]);
+  } catch {
+    return null;
+  }
+}
