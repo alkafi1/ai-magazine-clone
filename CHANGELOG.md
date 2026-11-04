@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Phase 8: Dockerfiles (API, web), full `docker compose up` stack with nginx, TLS override, CI workflow, backup/restore scripts, deployment guide; resilient discovery (computed month URLs + homepage fallback, zero-URL runs fail); true HTTP 410 for taken-down stories.
 - Phase 7: security hardening, selector-break detection (run warnings + alert), query-plan review with 3 new indexes.
 - Fix: manual runs now honour graceful shutdown; stale `running` runs are recovered at startup.
 - Phase 6: admin panel (login via httpOnly cookie, dashboard, article moderation + SEO overrides + takedown, scrape runs, manual run).

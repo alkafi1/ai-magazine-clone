@@ -31,7 +31,7 @@ test('login sets a locked-down session cookie', async ({ page, context }) => {
   await expect(page.getByText('Articles', { exact: true }).first()).toBeVisible();
 });
 
-test('moderation: feature, hide (public 404 + API 410), restore', async ({ page, request }) => {
+test('moderation: feature, hide (public 410), restore', async ({ page, request }) => {
   await login(page);
   await page.goto('/admin/articles?q=drug');
   const row = page.locator('tbody tr').first();

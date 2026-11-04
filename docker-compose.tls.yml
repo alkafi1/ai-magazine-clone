@@ -1,0 +1,13 @@
+# Adds HTTPS on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# Needs DOMAIN in .env and a Let's Encrypt certificate (see docs/DEPLOYMENT.md, step 6).
+services:
+  nginx:
+    ports: !override
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. DOMAIN=example.com}
+    volumes: !override
+      - ./nginx/production.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro

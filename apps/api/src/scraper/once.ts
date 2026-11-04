@@ -13,7 +13,8 @@ export type OnceResult = {
 /** Dry run used by `pnpm scrape:once`: fetch and parse, never touches the database. */
 export async function scrapeOnce(opts: { limit: number }): Promise<OnceResult> {
   const fetcher = await createFetcher();
-  const entries = await discoverEntries(fetcher, { months: 2 });
+  const { entries, warnings } = await discoverEntries(fetcher, { months: 2 });
+  warnings.forEach((w) => logger.warn(w));
   const result: OnceResult = {
     urlsFound: entries.length,
     articles: [],

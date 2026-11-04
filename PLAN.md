@@ -381,9 +381,9 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 8: Deploy (2 days)
 
-- [ ] Dockerfiles, Nginx, SSL, CI/CD
-- [ ] Monitoring (Sentry, uptime), Mongo backups
-- [ ] Submit sitemap to Google Search Console
+- [x] Dockerfiles, Nginx, SSL, CI/CD (prepared and tested locally; nothing deployed)
+- [x] Mongo backups (scripts tested); monitoring is documented, uptime/Sentry accounts are yours to create (docs/DEPLOYMENT.md section 9)
+- [ ] Submit sitemap to Google Search Console (**yours to do** after go-live: docs/DEPLOYMENT.md section 8)
 
 ### Timeline
 

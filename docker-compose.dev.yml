@@ -1,0 +1,5 @@
+# Dev override: publish MongoDB on localhost:27017 for `pnpm dev`, tests and the explain tool.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mongo
+services:
+  mongo:
+    ports: ['127.0.0.1:27017:27017']

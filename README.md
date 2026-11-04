@@ -19,24 +19,42 @@ apps/web       Next.js 16 frontend (App Router, Tailwind 4)
 packages/shared  zod schemas and types shared by both
 ```
 
-## Setup
+## Quick start
 
-Requires Node >= 20, pnpm, Docker.
+### Run everything in Docker (production-like)
+
+```bash
+cp .env.example .env     # set JWT_SECRET, REVALIDATE_SECRET (32+ chars), SCRAPER_CONTACT_EMAIL; remove the COMPOSE_FILE line
+docker compose up -d --build
+docker compose exec api node dist/db/create-admin.js you@example.com 'a-long-password'
+docker compose exec api node dist/scraper/run-cli.js --limit 20      # first articles (the 6-hourly schedule is already on)
+open http://localhost:8080          # site;  /admin = admin panel
+```
+
+Services: `mongo`, `api` (Express + scraper + scheduler), `web` (Next.js), `nginx` (the only published port). To take it
+live (domain, HTTPS, backups, Search Console): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+### Develop locally
+
+Requires Node >= 20, pnpm, Docker (for MongoDB only).
 
 ```bash
 pnpm install
-cp .env.example .env        # set SCRAPER_CONTACT_EMAIL to a real address
-docker compose up -d        # mongo + redis
+cp .env.example .env     # keeps COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml, which publishes Mongo on :27017
+docker compose up -d mongo
 pnpm --filter @aimag/shared build
+pnpm --filter @aimag/api dev          # API + scheduler on :4000
+pnpm --filter @aimag/web dev          # site on :3100
 ```
 
 ## Scripts
 
-| Command                        | What it does                                        |
-| ------------------------------ | --------------------------------------------------- |
-| `pnpm lint` / `pnpm format`    | ESLint / Prettier                                   |
-| `pnpm typecheck` / `pnpm test` | Type-check / run tests in all packages              |
-| `pnpm scrape:once --limit 20`  | Scrape up to 20 new articles and print them (no DB) |
+| Command                        | What it does                                                   |
+| ------------------------------ | -------------------------------------------------------------- |
+| `pnpm lint` / `pnpm format`    | ESLint / Prettier                                              |
+| `pnpm typecheck` / `pnpm test` | Type-check / run tests in all packages                         |
+| `pnpm scrape:once --limit 20`  | Scrape up to 20 new articles and print them (no DB)            |
+| `./scripts/backup-mongo.sh`    | Compressed DB dump with rotation (`restore-mongo.sh` restores) |
 
 ## Environment variables
 

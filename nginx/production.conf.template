@@ -1,0 +1,73 @@
+# Production TLS server. The official nginx image substitutes ${DOMAIN} (and only defined env vars) at
+# start-up. Used through docker-compose.tls.yml; certificates come from Let's Encrypt (docs/DEPLOYMENT.md).
+
+limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=general:10m rate=20r/s;
+
+upstream web { server web:3100; keepalive 16; }
+upstream api { server api:4000; keepalive 16; }
+
+server {
+    listen 80 default_server;
+    server_name _;
+    server_tokens off;
+    return 301 https://${DOMAIN}$request_uri;
+}
+
+# www and any other host name -> canonical domain
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name _;
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    return 301 https://${DOMAIN}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+    server_tokens off;
+    client_max_body_size 100k;
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_types text/css application/javascript application/json application/xml application/rss+xml image/svg+xml;
+
+    # nginx is the outermost proxy: always overwrite the client address so it cannot be spoofed.
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 30s;
+
+    limit_req zone=general burst=60 nodelay;
+
+    # Internal-only: the API and web app call these directly over the Docker network.
+    location = /api/revalidate { return 404; }
+
+    location = /api/admin/login {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://api;
+    }
+
+    location /api/ { proxy_pass http://api; }
+
+    location /_next/static/ {
+        proxy_pass http://web;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    }
+
+    location / { proxy_pass http://web; }
+}

@@ -37,6 +37,7 @@ const article = (n: number, over: Partial<ScrapedArticle> = {}): ScrapedArticle 
   ...over,
 });
 const entries = (n: number) => Array.from({ length: n }, (_, i) => entry(i + 1));
+const found = (n: number, warnings: string[] = []) => ({ entries: entries(n), warnings });
 /** fetchArticle answering from a plain list, reporting which layer served it. */
 const serve = (via = 'next-data') =>
   fetchArticle.mockImplementation(async (_f, e) => ({
@@ -59,11 +60,11 @@ afterAll(async () => {
 
 describe('runScrape', () => {
   it('imports new articles, skips known URLs, and logs the run', async () => {
-    discoverEntries.mockResolvedValue(entries(4));
+    discoverEntries.mockResolvedValue(found(4));
     serve();
     await runScrape({ trigger: 'cli' }); // first run imports all 4
     fetchArticle.mockClear();
-    discoverEntries.mockResolvedValue(entries(6));
+    discoverEntries.mockResolvedValue(found(6));
     const s = await runScrape({ trigger: 'cron' });
 
     expect(fetchArticle).toHaveBeenCalledTimes(2); // only the 2 new ones are fetched
@@ -76,7 +77,7 @@ describe('runScrape', () => {
   });
 
   it('honours limit, and refresh re-fetches known URLs without duplicating', async () => {
-    discoverEntries.mockResolvedValue(entries(5));
+    discoverEntries.mockResolvedValue(found(5));
     serve();
     expect((await runScrape({ trigger: 'cli', limit: 3 })).created).toBe(3);
     fetchArticle.mockClear();
@@ -87,7 +88,7 @@ describe('runScrape', () => {
   });
 
   it('records parse failures as ScrapeErrors and marks the run partial', async () => {
-    discoverEntries.mockResolvedValue(entries(3));
+    discoverEntries.mockResolvedValue(found(3));
     fetchArticle.mockImplementation(async (_f, e) => {
       if (e.loc === url(2)) throw new StageError('parse', 'no usable title/date in any layer');
       return { article: article(Number(e.loc.split('-').pop())), via: 'next-data' };
@@ -99,11 +100,30 @@ describe('runScrape', () => {
   });
 
   it('stops immediately and reports blocked on repeated 403/429', async () => {
-    discoverEntries.mockResolvedValue(entries(5));
+    discoverEntries.mockResolvedValue(found(5));
     fetchArticle.mockRejectedValue(new BlockedError('blocked (429) 3 times in a row'));
     const s = await runScrape({ trigger: 'cron' });
     expect(s.status).toBe('blocked');
     expect(fetchArticle).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails a run that finds zero URLs instead of reporting success', async () => {
+    discoverEntries.mockResolvedValue({ entries: [], warnings: ['no URLs from sitemaps'] });
+    const s = await runScrape({ trigger: 'cron' });
+    expect(s.status).toBe('failed');
+    const err = await ScrapeError.findOne({ run: s.runId, stage: 'discover' }).lean();
+    expect(err?.message).toMatch(/found no article URLs/);
+  });
+
+  it('records discovery warnings on the run', async () => {
+    discoverEntries.mockResolvedValue(found(3, ['fell back to the homepage latest-stories list']));
+    serve();
+    const s = await runScrape({ trigger: 'cron' });
+    expect(s.status).toBe('success');
+    expect(s.warnings).toContain('fell back to the homepage latest-stories list');
+    expect((await ScrapeRun.findById(s.runId).lean())?.warnings).toContain(
+      'fell back to the homepage latest-stories list',
+    );
   });
 
   it('fails the run (and logs a discover error) when discovery throws', async () => {
@@ -114,7 +134,7 @@ describe('runScrape', () => {
   });
 
   it('stops after the current page when aborted and reports partial', async () => {
-    discoverEntries.mockResolvedValue(entries(5));
+    discoverEntries.mockResolvedValue(found(5));
     const ctl = new AbortController();
     fetchArticle.mockImplementation(async (_f, e) => {
       ctl.abort();
@@ -127,13 +147,13 @@ describe('runScrape', () => {
 
 describe('selector-break detection in a run', () => {
   it('stays quiet for a healthy source', async () => {
-    discoverEntries.mockResolvedValue(entries(6));
+    discoverEntries.mockResolvedValue(found(6));
     serve('next-data');
     expect((await runScrape({ trigger: 'cron' })).warnings).toEqual([]);
   });
 
   it('warns and persists warnings when every page needed the meta fallback', async () => {
-    discoverEntries.mockResolvedValue(entries(6));
+    discoverEntries.mockResolvedValue(found(6));
     serve('meta');
     const s = await runScrape({ trigger: 'cron' });
     expect(s.status).toBe('success'); // the run "works", which is exactly why this needs its own signal
@@ -142,7 +162,7 @@ describe('selector-break detection in a run', () => {
   });
 
   it('warns loudly when nothing can be parsed', async () => {
-    discoverEntries.mockResolvedValue(entries(3));
+    discoverEntries.mockResolvedValue(found(3));
     fetchArticle.mockRejectedValue(new StageError('parse', 'no usable title/date in any layer'));
     const s = await runScrape({ trigger: 'cron' });
     expect(s.status).toBe('failed');

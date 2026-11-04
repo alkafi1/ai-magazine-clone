@@ -53,6 +53,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     warnings: [],
   };
   const stats = emptyStats();
+  const discoveryWarnings: string[] = [];
   const logError = (e: {
     url?: string;
     stage: 'discover' | 'fetch' | 'parse' | 'normalize' | 'save';
@@ -62,10 +63,18 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
 
   try {
     const fetcher = await createFetcher();
-    const entries = await discoverEntries(
+    const discovery = await discoverEntries(
       fetcher,
       opts.since ? { since: opts.since } : { months: 2 },
     );
+    const entries = discovery.entries;
+    discoveryWarnings.push(...discovery.warnings);
+    // A run that finds nothing must never look healthy: the source layout probably changed.
+    if (entries.length === 0) {
+      throw new Error(
+        `discovery found no article URLs (${discovery.warnings.join('; ') || 'no details'})`,
+      );
+    }
     s.urlsFound = entries.length;
 
     const known = new Set(
@@ -129,7 +138,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     logger.error({ err }, 'scrape run failed');
   }
 
-  s.warnings = assessHealth(stats);
+  s.warnings = [...discoveryWarnings, ...assessHealth(stats)];
   if (s.warnings.length) logger.warn({ warnings: s.warnings }, 'source format may have changed');
 
   await ScrapeRun.updateOne(

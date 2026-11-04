@@ -81,12 +81,18 @@ test.describe('article page', () => {
     expect((await request.get('/og/does-not-exist')).status()).toBe(404);
   });
 
-  test('hidden and unknown stories render the 404 page with 404 status', async ({ page }) => {
-    for (const slug of ['hidden-story', 'no-such-story']) {
-      const res = await page.goto(`/article/${slug}`);
-      expect(res?.status()).toBe(404);
-      await expect(page.getByRole('heading', { name: /gone off the wire/ })).toBeVisible();
-    }
+  test('taken-down stories answer 410, unknown ones 404, and both render a friendly page', async ({
+    page,
+  }) => {
+    const gone = await page.goto('/article/hidden-story');
+    expect(gone?.status()).toBe(410);
+    await expect(page.getByRole('heading', { name: /has been removed/ })).toBeVisible();
+    // Next adds its own noindex for non-200 responses on top of ours; both say noindex.
+    await expect(page.locator('meta[name=robots]').first()).toHaveAttribute('content', /noindex/);
+
+    const missing = await page.goto('/article/no-such-story');
+    expect(missing?.status()).toBe(404);
+    await expect(page.getByRole('heading', { name: /gone off the wire/ })).toBeVisible();
   });
 });
 

@@ -27,6 +27,12 @@ const csp = [
 ].join('; ');
 
 const config: NextConfig = {
+  // Self-contained server bundle for the Docker image (traced from the monorepo root).
+  output: 'standalone',
+  // Docker's legacy builder forbids signalling child processes (kill EACCES at the end of the build),
+  // so the Dockerfile sets NEXT_BUILD_THREADS=1 to use worker threads instead.
+  experimental: { workerThreads: process.env.NEXT_BUILD_THREADS === '1' },
+  outputFileTracingRoot: resolve(process.cwd(), '../../'),
   // The e2e suite builds into its own dir so it never clobbers a running dev/prod build.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   // Only used when IMAGE_OPTIMIZE=true (see components/Cover.tsx).

@@ -5,14 +5,14 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   MONGODB_URI: z.string().default('mongodb://localhost:27017/aimag'),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
   API_PORT: z.coerce.number().default(4000),
   // How many reverse proxies sit in front (Nginx, or the Next server forwarding the visitor's IP). 0 = none.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   CORS_ORIGINS: z.string().default('http://localhost:3100'),
   JWT_SECRET: z.string().default('dev-only-secret'),
   REVALIDATE_SECRET: z.string().default('dev-only-secret'),
-  WEB_URL: z.string().default('http://localhost:3100'),
+  WEB_URL: z.string().default('http://localhost:3100'), // where the API reaches the web app (revalidation)
+  SITE_URL: z.string().optional(), // public site URL, shown in the crawler User-Agent; defaults to WEB_URL
   SCRAPER_BASE_URL: z.string().url().default('https://aimagazine.com'),
   SCRAPER_CONTACT_EMAIL: z.string().email().default('you@example.com'),
   SCRAPER_DELAY_MS: z.coerce.number().min(1500).max(2000).default(1750),
@@ -42,7 +42,6 @@ export const config = {
   env: env.NODE_ENV,
   logLevel: env.LOG_LEVEL,
   mongoUri: env.MONGODB_URI,
-  redisUrl: env.REDIS_URL,
   port: env.API_PORT,
   trustProxyHops: env.TRUST_PROXY_HOPS ?? (env.NODE_ENV === 'production' ? 1 : 0),
   corsOrigins: env.CORS_ORIGINS.split(',').map((s) => s.trim()),
@@ -57,7 +56,7 @@ export const config = {
     sections: env.SCRAPER_SECTIONS.split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    userAgent: `AIMagBot/1.0 (+${env.WEB_URL}/about; contact: ${env.SCRAPER_CONTACT_EMAIL})`,
+    userAgent: `AIMagBot/1.0 (+${env.SITE_URL ?? env.WEB_URL}/about; contact: ${env.SCRAPER_CONTACT_EMAIL})`,
   },
   scheduler: {
     enabled: env.SCHEDULER_ENABLED === 'true',
