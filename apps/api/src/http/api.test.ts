@@ -46,6 +46,7 @@ async function seed() {
   docs.forEach((d, i) => (ids[`a${i + 1}`] = String(d._id)));
   await AdminUser.create({
     email: 'admin@example.com',
+    role: 'super_admin',
     passwordHash: await bcrypt.hash('correct-horse-battery', 4),
   });
 }

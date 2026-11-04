@@ -1,8 +1,10 @@
+import { ROLE_PERMISSIONS, assignableRoles, can, type Permission } from '@aimag/shared';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { isValidObjectId } from 'mongoose';
 import { z } from 'zod';
+import { startRun } from '../../scheduler/index.js';
+import { revalidateWeb } from '../../scheduler/revalidate.js';
 import {
   AdminUser,
   Article,
@@ -12,18 +14,18 @@ import {
   ScrapeError,
   ScrapeRun,
 } from '../../models/index.js';
-import { revalidateWeb } from '../../scheduler/revalidate.js';
-import { startRun } from '../../scheduler/index.js';
-import { adminOf, requireAdmin, signAdminToken } from '../middleware/auth.js';
+import { audit, auditAnonymous } from '../audit.js';
+import { adminOf, requireAdmin, requirePermission, signAdminToken } from '../middleware/auth.js';
 import { clearCache } from '../middleware/cache.js';
 import { HttpError, parse } from '../middleware/error.js';
-
-const page = z.coerce.number().int().min(1).max(10_000).default(1);
-const limit = z.coerce.number().int().min(1).max(100).default(20);
-const objectId = z.string().refine(isValidObjectId, 'invalid id');
+import { limit, objectId, page } from '../validators.js';
+import { adminMiscRouter } from './admin-misc.js';
+import { adminUsersRouter } from './admin-users.js';
 
 // A real hash to compare against when the user does not exist, so timing doesn't reveal accounts.
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
+const MAX_FAILED_LOGINS = 5;
+const LOCK_MS = 15 * 60_000;
 
 const patchBody = z
   .object({
@@ -41,6 +43,11 @@ const patchBody = z
   })
   .partial()
   .strict();
+
+/** 403 unless the signed-in admin's role grants `permission`. For checks that depend on the request body. */
+function need(req: Parameters<typeof adminOf>[0], permission: Permission) {
+  if (!can(adminOf(req).role, permission)) throw new HttpError(403, 'forbidden');
+}
 
 export function adminRouter(opts: { loginMax: number }) {
   const r = Router();
@@ -62,21 +69,87 @@ export function adminRouter(opts: { loginMax: number }) {
         req.body,
       );
       const user = await AdminUser.findOne({ email });
+      const locked = !!user?.lockedUntil && user.lockedUntil > new Date();
       const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
-      if (!user || !ok) throw new HttpError(401, 'invalid credentials');
+
+      if (!user || !user.active || locked || !ok) {
+        if (user?.active && !locked && !ok) {
+          user.failedLogins += 1;
+          if (user.failedLogins >= MAX_FAILED_LOGINS) {
+            user.failedLogins = 0;
+            user.lockedUntil = new Date(Date.now() + LOCK_MS);
+            await auditAnonymous(req, 'auth.locked', email, { minutes: LOCK_MS / 60_000 });
+          } else {
+            await auditAnonymous(req, 'auth.login_failed', email);
+          }
+          await user.save();
+        } else if (locked) {
+          await auditAnonymous(req, 'auth.login_while_locked', email);
+        }
+        // Same answer for unknown account, wrong password, disabled and locked: no account enumeration.
+        throw new HttpError(401, 'invalid credentials');
+      }
+
+      user.failedLogins = 0;
+      user.lockedUntil = undefined;
       user.lastLoginAt = new Date();
       await user.save();
-      const token = signAdminToken({ sub: String(user._id), email: user.email, role: user.role });
-      res.json({ token, user: { email: user.email, role: user.role } });
+      await AuditLog.create({
+        admin: user._id,
+        actorEmail: user.email,
+        action: 'auth.login',
+        ip: req.ip,
+      });
+      res.json({
+        token: signAdminToken({ id: String(user._id), tokenVersion: user.tokenVersion }),
+        user: { id: String(user._id), email: user.email, name: user.name, role: user.role },
+      });
     },
   );
 
   r.use(requireAdmin);
 
-  const audit = (req: Parameters<typeof adminOf>[0], action: string, target?: string) =>
-    AuditLog.create({ admin: adminOf(req).sub, action, target });
+  // ---- who am I / change own password -------------------------------------------------------
+  r.get('/me', (req, res) => {
+    const me = adminOf(req);
+    res.json({
+      ...me,
+      permissions: ROLE_PERMISSIONS[me.role],
+      assignableRoles: assignableRoles(me.role),
+    });
+  });
 
-  r.get('/articles', async (req, res) => {
+  r.patch('/me', async (req, res) => {
+    const { name } = parse(z.object({ name: z.string().trim().max(100) }), req.body);
+    await AdminUser.updateOne({ _id: adminOf(req).id }, { name });
+    await audit(req, 'account.rename');
+    res.json({ ok: true });
+  });
+
+  r.post('/me/password', async (req, res) => {
+    const body = parse(
+      z.object({ current: z.string().min(1).max(200), password: z.string().min(12).max(200) }),
+      req.body,
+    );
+    const user = await AdminUser.findById(adminOf(req).id);
+    if (!user || !(await bcrypt.compare(body.current, user.passwordHash))) {
+      throw new HttpError(400, 'current password is incorrect');
+    }
+    if (body.password === body.current) throw new HttpError(400, 'choose a different password');
+    user.passwordHash = await bcrypt.hash(body.password, 12);
+    user.passwordChangedAt = new Date();
+    user.tokenVersion += 1; // signs out every other session
+    await user.save();
+    await audit(req, 'account.password_changed');
+    // The caller gets a fresh token so their own session continues.
+    res.json({ token: signAdminToken({ id: String(user._id), tokenVersion: user.tokenVersion }) });
+  });
+
+  r.use('/users', adminUsersRouter());
+  r.use(adminMiscRouter());
+
+  // ---- articles -----------------------------------------------------------------------------
+  r.get('/articles', requirePermission('articles.view'), async (req, res) => {
     const q = parse(
       z.object({
         page,
@@ -84,6 +157,10 @@ export function adminRouter(opts: { loginMax: number }) {
         q: z.string().trim().max(100).optional(),
         hidden: z.enum(['true', 'false']).optional(),
         featured: z.enum(['true', 'false']).optional(),
+        category: z
+          .string()
+          .regex(/^[a-z0-9-]{1,120}$/)
+          .optional(),
       }),
       req.query,
     );
@@ -91,6 +168,10 @@ export function adminRouter(opts: { loginMax: number }) {
     if (q.q) filter.$text = { $search: q.q };
     if (q.hidden) filter.isHidden = q.hidden === 'true';
     if (q.featured) filter.isFeatured = q.featured === 'true';
+    if (q.category) {
+      const c = await Category.findOne({ slug: q.category }, '_id').lean();
+      filter.category = c?._id ?? null;
+    }
     const [items, total] = await Promise.all([
       Article.find(filter)
         .sort({ publishedAt: -1 })
@@ -120,7 +201,7 @@ export function adminRouter(opts: { loginMax: number }) {
     });
   });
 
-  r.get('/articles/:id', async (req, res) => {
+  r.get('/articles/:id', requirePermission('articles.view'), async (req, res) => {
     const id = parse(objectId, req.params.id);
     const a = await Article.findById(id)
       .populate('category', 'name slug')
@@ -153,6 +234,11 @@ export function adminRouter(opts: { loginMax: number }) {
   r.patch('/articles/:id', async (req, res) => {
     const id = parse(objectId, req.params.id);
     const body = parse(patchBody, req.body);
+    // Each kind of change needs its own permission, so e.g. an editor cannot hide stories.
+    if (body.isHidden !== undefined || body.status !== undefined) need(req, 'articles.moderate');
+    if (body.isFeatured !== undefined) need(req, 'articles.feature');
+    if (body.seo !== undefined) need(req, 'articles.seo');
+
     const set: Record<string, unknown> = {};
     if (body.isHidden !== undefined) {
       set.isHidden = body.isHidden;
@@ -172,9 +258,12 @@ export function adminRouter(opts: { loginMax: number }) {
       { returnDocument: 'after' },
     ).lean();
     if (!a) throw new HttpError(404, 'not found');
-    await audit(req, 'article.update', String(a._id));
+    await audit(req, 'article.update', String(a._id), {
+      title: a.title,
+      changes: Object.keys(set),
+    });
     clearCache();
-    void revalidateWeb({ articleSlugs: [a.slug], categorySlugs: [] });
+    void revalidateWeb({ articleSlugs: [a.slug] });
     res.json({
       id: String(a._id),
       isHidden: a.isHidden,
@@ -184,8 +273,43 @@ export function adminRouter(opts: { loginMax: number }) {
     });
   });
 
+  // Several stories at once. Same permissions as the single-article actions.
+  r.post('/articles/bulk', async (req, res) => {
+    const body = parse(
+      z.object({
+        ids: z.array(objectId).min(1).max(100),
+        action: z.enum(['hide', 'restore', 'feature', 'unfeature']),
+      }),
+      req.body,
+    );
+    need(
+      req,
+      body.action === 'feature' || body.action === 'unfeature'
+        ? 'articles.feature'
+        : 'articles.moderate',
+    );
+    const set: Record<string, unknown> =
+      body.action === 'hide'
+        ? { isHidden: true, status: 'hidden', isFeatured: false }
+        : body.action === 'restore'
+          ? { isHidden: false, status: 'published' }
+          : { isFeatured: body.action === 'feature' };
+    const filter: Record<string, unknown> = { _id: { $in: body.ids } };
+    if (body.action === 'feature') filter.isHidden = false; // never feature a hidden story
+
+    const slugs = (await Article.find(filter, 'slug').lean()).map((a) => a.slug);
+    const result = await Article.updateMany(filter, { $set: set });
+    await audit(req, `article.bulk_${body.action}`, undefined, {
+      count: result.modifiedCount,
+      ids: body.ids,
+    });
+    clearCache();
+    void revalidateWeb({ articleSlugs: slugs });
+    res.json({ matched: result.matchedCount, modified: result.modifiedCount });
+  });
+
   // Takedown, not a hard delete: the row stays (hidden, 410) so the scraper does not re-import it.
-  r.delete('/articles/:id', async (req, res) => {
+  r.delete('/articles/:id', requirePermission('articles.moderate'), async (req, res) => {
     const id = parse(objectId, req.params.id);
     const a = await Article.findByIdAndUpdate(
       id,
@@ -193,13 +317,14 @@ export function adminRouter(opts: { loginMax: number }) {
       { returnDocument: 'after' },
     ).lean();
     if (!a) throw new HttpError(404, 'not found');
-    await audit(req, 'article.takedown', String(a._id));
+    await audit(req, 'article.takedown', String(a._id), { title: a.title });
     clearCache();
-    void revalidateWeb({ articleSlugs: [a.slug], categorySlugs: [] });
+    void revalidateWeb({ articleSlugs: [a.slug] });
     res.status(204).end();
   });
 
-  r.get('/scrape-runs', async (req, res) => {
+  // ---- scrape runs --------------------------------------------------------------------------
+  r.get('/scrape-runs', requirePermission('scrape.view'), async (req, res) => {
     const q = parse(z.object({ page, limit }), req.query);
     const [runs, total] = await Promise.all([
       ScrapeRun.find()
@@ -225,32 +350,69 @@ export function adminRouter(opts: { loginMax: number }) {
     });
   });
 
-  r.post('/scrape-runs', async (req, res) => {
+  r.post('/scrape-runs', requirePermission('scrape.run'), async (req, res) => {
     await audit(req, 'scrape.manual');
     startRun('manual');
     res.status(202).json({ accepted: true });
   });
 
-  r.get('/stats', async (_req, res) => {
+  // ---- dashboard ----------------------------------------------------------------------------
+  r.get('/stats', requirePermission('dashboard.view'), async (_req, res) => {
     const day = new Date(Date.now() - 24 * 3600 * 1000);
-    const [articles, hidden, featured, categories, last24h, subscribers, lastRun, byCategory] =
-      await Promise.all([
-        Article.countDocuments(),
-        Article.countDocuments({ isHidden: true }),
-        Article.countDocuments({ isFeatured: true }),
-        Category.countDocuments(),
-        Article.countDocuments({ scrapedAt: { $gte: day } }),
-        NewsletterSubscriber.countDocuments(),
-        ScrapeRun.findOne().sort({ startedAt: -1 }).lean(),
-        Article.aggregate([
-          { $group: { _id: '$category', n: { $sum: 1 } } },
-          { $sort: { n: -1 } },
-          { $limit: 10 },
-        ]),
-      ]);
+    const since30 = new Date(Date.now() - 29 * 24 * 3600 * 1000);
+    since30.setUTCHours(0, 0, 0, 0);
+    const [
+      articles,
+      hidden,
+      featured,
+      categories,
+      last24h,
+      subscribers,
+      lastRun,
+      byCategory,
+      perDay,
+      runs,
+      views,
+      admins,
+    ] = await Promise.all([
+      Article.countDocuments(),
+      Article.countDocuments({ isHidden: true }),
+      Article.countDocuments({ isFeatured: true }),
+      Category.countDocuments(),
+      Article.countDocuments({ scrapedAt: { $gte: day } }),
+      NewsletterSubscriber.countDocuments(),
+      ScrapeRun.findOne().sort({ startedAt: -1 }).lean(),
+      Article.aggregate([
+        { $group: { _id: '$category', n: { $sum: 1 } } },
+        { $sort: { n: -1 } },
+        { $limit: 10 },
+      ]),
+      Article.aggregate<{ _id: string; n: number }>([
+        { $match: { publishedAt: { $gte: since30 } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$publishedAt', timezone: 'UTC' } },
+            n: { $sum: 1 },
+          },
+        },
+      ]),
+      ScrapeRun.find({}, 'startedAt status created updated failed durationMs warnings')
+        .sort({ startedAt: -1 })
+        .limit(20)
+        .lean(),
+      Article.aggregate<{ _id: null; n: number }>([
+        { $group: { _id: null, n: { $sum: '$viewCount' } } },
+      ]),
+      AdminUser.countDocuments({ active: true }),
+    ]);
     const names = new Map(
       (await Category.find({}, 'name').lean()).map((c) => [String(c._id), c.name]),
     );
+    const counts = new Map(perDay.map((d) => [d._id, d.n]));
+    const daily = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(since30.getTime() + i * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      return { date: d, count: counts.get(d) ?? 0 };
+    });
     res.json({
       articles,
       hidden,
@@ -258,7 +420,11 @@ export function adminRouter(opts: { loginMax: number }) {
       categories,
       scrapedLast24h: last24h,
       subscribers,
+      totalViews: views[0]?.n ?? 0,
+      activeAdmins: admins,
       lastRun,
+      daily,
+      recentRuns: runs.reverse(),
       topCategories: byCategory.map((c) => ({
         name: names.get(String(c._id)) ?? 'Unknown',
         count: c.n,

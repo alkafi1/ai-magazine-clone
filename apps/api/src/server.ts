@@ -1,5 +1,6 @@
 import { config } from './config/index.js';
 import { connectDb, disconnectDb } from './db/connection.js';
+import { ensureSuperAdmin } from './db/admins.js';
 import { seedCategories } from './db/seed.js';
 import { createApp } from './http/app.js';
 import { logger } from './lib/logger.js';
@@ -9,6 +10,7 @@ import { recoverStaleRuns } from './scheduler/runner.js';
 await connectDb();
 await seedCategories();
 await recoverStaleRuns();
+await ensureSuperAdmin();
 const server = createApp().listen(config.port, () =>
   logger.info({ port: config.port }, 'api listening'),
 );
