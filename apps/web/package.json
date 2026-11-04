@@ -1,0 +1,10 @@
+{
+  "name": "@aimag/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "echo \"web app is added in Phase 5\"",
+    "build": "echo \"web app is added in Phase 5\"",
+    "test": "echo \"no tests yet\""
+  }
+}
