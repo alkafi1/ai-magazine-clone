@@ -5,7 +5,7 @@ import { logger } from '../../lib/logger.js';
 import { Article, Author, Category, NewsletterSubscriber, Tag } from '../../models/index.js';
 import { revalidateWeb } from '../../scheduler/revalidate.js';
 import { config } from '../../config/index.js';
-import { cached } from '../middleware/cache.js';
+import { cached, clearCache } from '../middleware/cache.js';
 import { requireSecret } from '../middleware/auth.js';
 import { HttpError, parse } from '../middleware/error.js';
 import { publicArticle } from '../serializers.js';
@@ -127,10 +127,15 @@ export function publicRouter(opts: { newsletterMax: number }) {
       .limit(5)
       .populate(populate)
       .lean();
-    const recent = await latest(VISIBLE, 14);
+    const recent = await latest(VISIBLE, 20);
     const hero = featured[0] ?? recent[0] ?? null;
     const heroId = hero ? String(hero._id) : null;
-    const featuredRest = featured.filter((a) => String(a._id) !== heroId).slice(0, 4);
+    // Editors' picks first; if fewer than 4, fill the rail with the newest other stories.
+    const picks = featured.filter((a) => String(a._id) !== heroId);
+    const filler = recent.filter(
+      (a) => String(a._id) !== heroId && !picks.some((p) => String(p._id) === String(a._id)),
+    );
+    const featuredRest = [...picks, ...filler].slice(0, 4);
     const used = new Set([heroId, ...featuredRest.map((a) => String(a._id))]);
     const latestList = recent.filter((a) => !used.has(String(a._id))).slice(0, 10);
 
@@ -174,6 +179,71 @@ export function publicRouter(opts: { newsletterMax: number }) {
   r.get('/tags', cached(300), async (_req, res) => {
     const tags = await Tag.find().sort({ name: 1 }).limit(200).lean();
     res.json({ items: tags.map((t) => ({ name: t.name, slug: t.slug })) });
+  });
+
+  r.get('/tags/:slug', cached(300), async (req, res) => {
+    const slug = parse(slugParam, req.params.slug);
+    const t = await Tag.findOne({ slug }).lean();
+    if (!t) throw new HttpError(404, 'not found');
+    res.json({ name: t.name, slug: t.slug });
+  });
+
+  // --- Feeds for the web app's sitemaps (slugs and dates only) ---
+  const SITEMAP_PAGE = 1000;
+
+  r.get('/sitemap/articles', cached(300), async (req, res) => {
+    const { page } = parse(
+      z.object({ page: z.coerce.number().int().min(1).max(1000).default(1) }),
+      req.query,
+    );
+    const [items, total] = await Promise.all([
+      Article.find(VISIBLE, 'slug publishedAt scrapedAt seo.noindex')
+        .sort({ publishedAt: -1 })
+        .skip((page - 1) * SITEMAP_PAGE)
+        .limit(SITEMAP_PAGE)
+        .lean(),
+      Article.countDocuments(VISIBLE),
+    ]);
+    res.json({
+      page,
+      total,
+      pageCount: Math.max(1, Math.ceil(total / SITEMAP_PAGE)),
+      items: items
+        .filter((a) => !a.seo?.noindex)
+        .map((a) => ({
+          slug: a.slug,
+          publishedAt: a.publishedAt,
+          updatedAt: a.scrapedAt ?? a.publishedAt,
+        })),
+    });
+  });
+
+  // Google News sitemap: articles from the last 48 hours.
+  r.get('/sitemap/news', cached(300), async (_req, res) => {
+    const since = new Date(Date.now() - 48 * 3600 * 1000);
+    const items = await Article.find(
+      { ...VISIBLE, publishedAt: { $gte: since }, 'seo.noindex': { $ne: true } },
+      'slug title publishedAt',
+    )
+      .sort({ publishedAt: -1 })
+      .limit(1000)
+      .lean();
+    res.json({
+      items: items.map((a) => ({ slug: a.slug, title: a.title, publishedAt: a.publishedAt })),
+    });
+  });
+
+  r.get('/sitemap/pages', cached(300), async (_req, res) => {
+    const [categories, tags, authors] = await Promise.all([
+      Category.find({}, 'slug').lean(),
+      Tag.find({}, 'slug').lean(),
+      Author.find({}, 'slug').lean(),
+    ]);
+    res.json({
+      categories: categories.map((c) => c.slug),
+      tags: tags.map((t) => t.slug),
+      authors: authors.map((a) => a.slug),
+    });
   });
 
   r.get('/authors/:slug', cached(300), async (req, res) => {
@@ -252,6 +322,7 @@ export function publicRouter(opts: { newsletterMax: number }) {
         req.body ?? {},
       );
       logger.info({ ...body }, 'revalidate requested');
+      clearCache();
       res.json({ ok: await revalidateWeb(body) });
     },
   );

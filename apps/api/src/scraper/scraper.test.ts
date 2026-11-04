@@ -64,7 +64,8 @@ describe('layered parser', () => {
     expect(raw.authorName).toBe('Adam Pond');
     expect(raw.categoryName).toBe('AI Strategy');
     expect(raw.publishedAt).toBe('2026-11-02T09:27:50.755Z');
-    expect(raw.imageUrl).toContain('assets.bizclikmedia.net/1200/');
+    expect(raw.imageUrl).toContain('assets.bizclikmedia.net/668/');
+    expect(raw.imageThumbUrl).toContain('assets.bizclikmedia.net/322/');
   });
   it('falls back to JSON-LD', () => {
     const raw = parseArticleHtml(fixture('article-json-ld.html'))!;
@@ -99,6 +100,7 @@ describe('normalizer', () => {
         'category',
         'excerpt',
         'imageAlt',
+        'imageThumbUrl',
         'imageUrl',
         'publishedAt',
         'slug',

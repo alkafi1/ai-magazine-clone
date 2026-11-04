@@ -143,6 +143,17 @@ describe('public API', () => {
     expect(res.body.total).toBe(4);
   });
 
+  it('serves sitemap feeds and tag lookups', async () => {
+    const arts = await request(app).get('/api/sitemap/articles').expect(200);
+    expect(arts.body.total).toBe(4);
+    expect(arts.body.items.map((a: { slug: string }) => a.slug)).not.toContain('article-5');
+    const news = await request(app).get('/api/sitemap/news').expect(200);
+    expect(news.body.items.length).toBe(4);
+    const pages = await request(app).get('/api/sitemap/pages').expect(200);
+    expect(pages.body.categories).toEqual(expect.arrayContaining(['ai-strategy', 'robotics']));
+    await request(app).get('/api/tags/missing').expect(404);
+  });
+
   it('counts views', async () => {
     await request(app).post('/api/articles/article-2/view').expect(204);
     expect((await Article.findOne({ slug: 'article-2' }))?.viewCount).toBe(1);

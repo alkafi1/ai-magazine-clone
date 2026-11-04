@@ -1,4 +1,5 @@
 import { config } from '../config/index.js';
+import { clearCache } from '../http/middleware/cache.js';
 import { logger } from '../lib/logger.js';
 import { runScrape, type RunOptions, type RunSummary } from '../scraper/pipeline.js';
 import { sendAlert } from './alert.js';
@@ -44,6 +45,7 @@ export async function executeRun(
     }
 
     if (summary.created + summary.updated > 0) {
+      clearCache(); // so the web app re-fetches fresh data, not our cached responses
       await revalidateWeb({ articleSlugs: summary.newSlugs, categorySlugs: summary.categorySlugs });
     }
     if (!summary.aborted && (summary.status === 'failed' || summary.status === 'blocked')) {

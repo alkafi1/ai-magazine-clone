@@ -15,7 +15,7 @@ See [PLAN.md](PLAN.md) for scope, database design, SEO and API plans.
 
 ```
 apps/api       Express API, scraper, scheduler
-apps/web       Next.js frontend (Phase 5)
+apps/web       Next.js 16 frontend (App Router, Tailwind 4)
 packages/shared  zod schemas and types shared by both
 ```
 
@@ -41,6 +41,39 @@ pnpm --filter @aimag/shared build
 ## Environment variables
 
 See [.env.example](.env.example); all are validated with zod in `apps/api/src/config`.
+
+## Web app (Synthwire)
+
+Brand: **Synthwire** — ink navy `#0c1222`, warm paper `#faf8f3`, violet `#5b3df5` accent, amber `#ffb703` highlight;
+Fraunces (headlines) + Inter (text); own wire-pulse logo. Change the name in `apps/web/src/lib/site.ts`.
+
+```bash
+pnpm --filter @aimag/api dev        # API on :4000 (also runs the scheduler)
+pnpm --filter @aimag/web dev        # site on :3100
+pnpm --filter @aimag/web build && pnpm --filter @aimag/web start
+```
+
+- Pages: `/`, `/latest`, `/category/:slug`, `/tag/:slug`, `/author/:slug` (all paginated as `/page/2`), `/article/:slug`,
+  `/search` (noindex), `/about`, `/contact`, `/privacy`, `/terms`, `/dmca`, 404. Admin comes in Phase 6.
+- Rendering: ISR (`revalidate` 120s home, 300s elsewhere) plus on-demand `POST /api/revalidate` (secret header),
+  called by the API after each scrape. Tags: `home`, `category:<slug>`, `article:<slug>`, `categories`, `latest`.
+- SEO: `generateMetadata` on every page, canonical URLs, OG/Twitter tags with a generated branded card at
+  `/og/<slug>` (we never re-share the source's picture), JSON-LD `Organization`, `WebSite`+`SearchAction`,
+  `NewsArticle` (with `isBasedOn` = original URL) and `BreadcrumbList`, `/sitemap.xml` (index) ->
+  `/sitemaps/pages.xml`, `/sitemaps/articles/N.xml` (1000 per file), `/news-sitemap.xml` (last 48h), `/robots.txt`,
+  own RSS at `/feed.xml`.
+- Removed/unknown stories render the 404 page (App Router pages cannot send 410; the API does return 410 and
+  Nginx can map it in Phase 8).
+- Client JS is limited to the newsletter form and a view beacon; the menu uses `<details>`.
+
+### Images and Lighthouse (decision needed)
+
+By default (`IMAGE_OPTIMIZE` unset) story pictures are **hotlinked** from the source CDN, using its small variants
+(322px for cards, 668px for hero/article). The source serves PNGs, so heavy stories cost performance:
+Lighthouse mobile in this mode scored 76-95 performance depending on the story (accessibility, best practices
+and SEO are 98-100 everywhere). With `IMAGE_OPTIMIZE=true` (set at **build and run** time) Next resizes and converts
+to WebP and caches those derivatives on our server: **home 94, article 99, category 96**. That means we store
+resized copies of source images, so it is off until you decide it is acceptable.
 
 ## API
 

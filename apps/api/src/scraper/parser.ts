@@ -10,6 +10,7 @@ export type RawArticle = {
   categoryName: string | null;
   sectionSlug: string | null;
   imageUrl: string | null;
+  imageThumbUrl: string | null;
   imageAlt: string | null;
   canonicalUrl: string | null;
   source: 'next-data' | 'json-ld' | 'meta';
@@ -17,13 +18,31 @@ export type RawArticle = {
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-/** Preferred image variants, best first. */
+/**
+ * Source image variants, best first. The main image is a mid-size one (668px): the 1200px
+ * variants can be several MB. The thumb is a ~320px variant for cards.
+ */
 const IMAGE_KEYS = [
-  'share_widescreen_1200',
+  'hero_widescreen_668',
+  'hero_landscape_668',
   'hero_widescreen_900',
-  'thumbnail_landscape_900',
   'thumbnail_landscape_580',
 ];
+const THUMB_KEYS = [
+  'thumbnail_landscape_322',
+  'thumbnail_landscape_290',
+  'thumbnail_landscape_412',
+  'thumbnail_landscape_580',
+];
+
+function pickImage(images: Dict, keys: string[]): { url: string; caption: string | null } | null {
+  for (const key of keys) {
+    const first = Array.isArray(images[key]) ? (images[key] as unknown[])[0] : null;
+    if (isDict(first) && str(first.url))
+      return { url: str(first.url)!, caption: str(first.caption) };
+  }
+  return null;
+}
 
 type Dict = Record<string, unknown>;
 const isDict = (v: unknown): v is Dict => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -41,17 +60,9 @@ export function parseNextData($: cheerio.CheerioAPI): RawArticle | null {
   }
   if (!isDict(article)) return null;
 
-  let imageUrl: string | null = null;
-  let imageAlt: string | null = null;
   const images = isDict(article.images) ? article.images : {};
-  for (const key of IMAGE_KEYS) {
-    const first = Array.isArray(images[key]) ? (images[key] as unknown[])[0] : null;
-    if (isDict(first) && str(first.url)) {
-      imageUrl = str(first.url);
-      imageAlt = str(first.caption);
-      break;
-    }
-  }
+  const main = pickImage(images, IMAGE_KEYS);
+  const thumb = pickImage(images, THUMB_KEYS);
   const author = isDict(article.author) ? str(article.author.name) : null;
   const section = isDict(article.section) ? str(article.section.slug) : null;
   const path = str(article.fullUrlPath);
@@ -64,8 +75,9 @@ export function parseNextData($: cheerio.CheerioAPI): RawArticle | null {
     authorName: author,
     categoryName: str(article.category),
     sectionSlug: section,
-    imageUrl,
-    imageAlt,
+    imageUrl: main?.url ?? null,
+    imageThumbUrl: thumb?.url ?? null,
+    imageAlt: main?.caption ?? null,
     canonicalUrl: str(article.canonicalUrl) ?? (path ? new URL(path, 'https://x').pathname : null),
     source: 'next-data',
   };
@@ -94,6 +106,7 @@ export function parseJsonLd($: cheerio.CheerioAPI): RawArticle | null {
       categoryName: str(node.articleSection),
       sectionSlug: null,
       imageUrl: isDict(img) ? str(img.url) : str(img),
+      imageThumbUrl: null,
       imageAlt: isDict(img) ? str(img.caption) : null,
       canonicalUrl: str(node.url),
       source: 'json-ld',
@@ -115,6 +128,7 @@ export function parseMeta($: cheerio.CheerioAPI): RawArticle {
     categoryName: meta('article:section'),
     sectionSlug: null,
     imageUrl: meta('og:image'),
+    imageThumbUrl: null,
     imageAlt: meta('og:image:alt'),
     canonicalUrl: str($('link[rel="canonical"]').attr('href')) ?? meta('og:url'),
     source: 'meta',

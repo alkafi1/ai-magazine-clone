@@ -8,6 +8,8 @@ export const scrapedArticleSchema = z.object({
   title: z.string().min(1),
   excerpt: z.string().max(EXCERPT_MAX),
   imageUrl: z.string().url().nullable(),
+  /** Small variant (about 320px wide) for cards. */
+  imageThumbUrl: z.string().url().nullable(),
   imageAlt: z.string().nullable(),
   category: z.object({ name: z.string(), slug: z.string() }),
   authorName: z.string().nullable(),

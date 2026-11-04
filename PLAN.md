@@ -363,11 +363,11 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 5: Frontend MVP, SEO-first (7-9 days)
 
-- [ ] Design tokens, layout, header/footer/mega menu
-- [ ] Home, Category, Article, Tag, Author, Search, static pages
-- [ ] Metadata, JSON-LD, sitemaps, robots, OG images, own RSS
-- [ ] ISR plus on-demand revalidation
-- [ ] Responsive pass, accessibility pass, Lighthouse pass
+- [x] Design tokens, layout, header/footer/mega menu
+- [x] Home, Category, Article, Tag, Author, Search, static pages
+- [x] Metadata, JSON-LD, sitemaps, robots, OG images, own RSS
+- [x] ISR plus on-demand revalidation
+- [x] Responsive pass, accessibility pass, Lighthouse pass
 
 ### Phase 6: Admin panel (3-4 days)
 

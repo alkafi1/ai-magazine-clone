@@ -56,6 +56,7 @@ export function normalizeArticle(
   const excerpt = makeExcerpt(raw.description);
   const imageUrl =
     config.imageMode === 'placeholder' ? null : (raw.imageUrl ?? sitemapEntry?.imageUrl ?? null);
+  const imageThumbUrl = config.imageMode === 'placeholder' ? null : (raw.imageThumbUrl ?? null);
   const imageAlt = raw.imageAlt ?? sitemapEntry?.imageCaption ?? null;
 
   const urlPath = new URL(sourceUrl).pathname.split('/').filter(Boolean);
@@ -68,6 +69,7 @@ export function normalizeArticle(
     title,
     excerpt,
     imageUrl,
+    imageThumbUrl,
     imageAlt: imageAlt ? decodeEntities(imageAlt).slice(0, 300) : null,
     category: { name: categoryName, slug: slugify(categoryName) },
     authorName: raw.authorName,
@@ -77,7 +79,9 @@ export function normalizeArticle(
     sourceSlug,
     slug: slugify(title) || sourceSlug,
     // Hash of the fields that matter for change detection (PLAN.md section 4).
-    sourceHash: sha([title, excerpt, imageUrl ?? '', raw.modifiedAt ?? ''].join('\n')),
+    sourceHash: sha(
+      [title, excerpt, imageUrl ?? '', imageThumbUrl ?? '', raw.modifiedAt ?? ''].join('\n'),
+    ),
   };
   const parsed = scrapedArticleSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;

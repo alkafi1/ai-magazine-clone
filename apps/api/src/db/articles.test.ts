@@ -12,6 +12,7 @@ const sample = (over: Partial<ScrapedArticle> = {}): ScrapedArticle => ({
   title: 'Sample Title',
   excerpt: 'A short excerpt.',
   imageUrl: 'https://assets.example.com/a.jpg',
+  imageThumbUrl: 'https://assets.example.com/a-small.jpg',
   imageAlt: 'alt',
   category: { name: 'AI Strategy', slug: 'ai-strategy' },
   authorName: 'Adam Pond',

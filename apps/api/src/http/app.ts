@@ -15,7 +15,8 @@ export function createApp(opts: AppOptions = {}) {
   // Behind Nginx in production: trust the first proxy so rate limits see the real client IP.
   if (config.env === 'production') app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // CORP cross-origin: the web app (another origin) sends view beacons to this API.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(
     cors({
       origin(origin, cb) {

@@ -49,6 +49,7 @@ export async function upsertArticle(
     title: a.title,
     excerpt: a.excerpt,
     imageUrl: a.imageUrl ?? undefined,
+    imageThumbUrl: a.imageThumbUrl ?? undefined,
     imageAlt: a.imageAlt ?? undefined,
     category,
     author,

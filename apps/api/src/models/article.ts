@@ -16,6 +16,7 @@ const articleSchema = new Schema({
   slug: { type: String, required: true },
   excerpt: { type: String, required: true, maxlength: 200 },
   imageUrl: String,
+  imageThumbUrl: String,
   imageAlt: String,
   imageCredit: String,
   category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },

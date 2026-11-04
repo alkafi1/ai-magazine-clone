@@ -11,6 +11,8 @@ export type RunOptions = {
   limit?: number;
   /** 'YYYY-MM': backfill every monthly sitemap from this month. */
   since?: string;
+  /** Re-fetch URLs we already hold (sourceHash decides whether anything is rewritten). */
+  refresh?: boolean;
   /** Stop fetching (after the current page) when aborted, e.g. on shutdown. */
   signal?: AbortSignal;
 };
@@ -68,7 +70,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
       ).map((a) => a.sourceUrl),
     );
     s.skipped = known.size;
-    const fresh = entries.filter((e) => !known.has(e.loc));
+    const fresh = opts.refresh ? entries : entries.filter((e) => !known.has(e.loc));
     // Newest sitemap entries are listed last-month-first by pickArticleSitemaps; cap the fetch count.
     const todo = opts.limit ? fresh.slice(0, opts.limit) : fresh;
     logger.info(

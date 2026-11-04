@@ -4,6 +4,7 @@ type Populated = {
   slug: string;
   excerpt: string;
   imageUrl?: string | null;
+  imageThumbUrl?: string | null;
   imageAlt?: string | null;
   category?: { name?: string; slug?: string } | null;
   author?: { name?: string; slug?: string } | null;
@@ -36,6 +37,7 @@ export function publicArticle(a: unknown) {
     slug: d.slug,
     excerpt: d.excerpt,
     imageUrl: d.imageUrl ?? null,
+    imageThumbUrl: d.imageThumbUrl ?? d.imageUrl ?? null,
     imageAlt: d.imageAlt ?? null,
     category: ref(d.category),
     author: ref(d.author),
