@@ -1,0 +1,19 @@
+# Robots.txt
+# Custom IB 08-01-2025
+User-agent: *
+SiteMap: https://aimagazine.com/sitemap.xml
+Disallow: /thank-you
+Disallow: /cdn-cgi/
+Disallow: /404
+Disallow: /search
+Disallow: /my-account
+Disallow: /executives/
+Disallow: /executive/
+Disallow: /company/
+Disallow: /companies/
+Disallow: /homepage-beta
+Disallow: /*?
+# Legacy Sections
+Disallow: /sites/
+Disallow: /_next
+Disallow: *-image-*-17*

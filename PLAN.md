@@ -325,21 +325,21 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 0: Setup (1-2 days)
 
-- [ ] Init monorepo (pnpm workspaces), TypeScript, ESLint, Prettier, Husky
-- [ ] Docker Compose: mongo, redis
-- [ ] `.env.example`, config module, logger
-- [ ] README with run instructions
+- [x] Init monorepo (pnpm workspaces), TypeScript, ESLint, Prettier, Husky
+- [x] Docker Compose: mongo, redis
+- [x] `.env.example`, config module, logger
+- [x] README with run instructions
 
 ### Phase 1: Scraper prototype (2-3 days) **<- do this first**
 
-- [ ] robots.txt fetcher and path checker
-- [ ] Sitemap reader (index -> current and previous month article sitemaps)
-- [ ] Article page fetcher with delay/retry/backoff
-- [ ] `__NEXT_DATA__` parser with JSON-LD and meta fallbacks
-- [ ] Normalizer to Article shape (excerpt trimming, slug, category, author)
-- [ ] Save sample HTML fixtures and write parser unit tests
-- [ ] CLI: `pnpm scrape:once --limit 20` prints results
-- [ ] **Gate:** if blocked or data is unusable, stop and report before building more
+- [x] robots.txt fetcher and path checker
+- [x] Sitemap reader (index -> current and previous month article sitemaps)
+- [x] Article page fetcher with delay/retry/backoff
+- [x] `__NEXT_DATA__` parser with JSON-LD and meta fallbacks
+- [x] Normalizer to Article shape (excerpt trimming, slug, category, author)
+- [x] Save sample HTML fixtures and write parser unit tests
+- [x] CLI: `pnpm scrape:once --limit 20` prints results
+- [x] **Gate:** if blocked or data is unusable, stop and report before building more
 
 ### Phase 2: Database and persistence (1-2 days)
 
