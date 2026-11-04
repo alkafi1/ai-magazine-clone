@@ -32,8 +32,17 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(err.status).json({ error: err.message });
     return;
   }
-  if ((err as { type?: string }).type === 'entity.parse.failed') {
-    res.status(400).json({ error: 'invalid JSON' });
+  // Errors from the body parser (bad JSON, body too large, ...) carry their own 4xx status.
+  const e = err as { type?: string; status?: number };
+  if (
+    typeof e.status === 'number' &&
+    e.status >= 400 &&
+    e.status < 500 &&
+    e.type?.startsWith('entity.')
+  ) {
+    res
+      .status(e.status)
+      .json({ error: e.status === 413 ? 'payload too large' : 'invalid request body' });
     return;
   }
   logger.error({ err }, 'unhandled error');

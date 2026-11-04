@@ -45,11 +45,15 @@ export class PoliteFetcher {
 
   isAllowed(url: string): boolean {
     if (!this.robots) throw new Error('call loadRobots() first');
-    return this.robots.isAllowed(url);
+    return new URL(url).origin === new URL(this.opts.baseUrl).origin && this.robots.isAllowed(url);
   }
 
-  /** Fetch a page as text. Throws DisallowedError if robots forbids it. */
+  /** Fetch a page as text. Throws DisallowedError if robots forbids it or the host is not the source. */
   async get(url: string): Promise<string> {
+    // Sitemaps are remote input: never follow a link to another host.
+    if (new URL(url).origin !== new URL(this.opts.baseUrl).origin) {
+      throw new DisallowedError(`refusing to fetch off-site URL ${url}`);
+    }
     if (!this.isAllowed(url)) throw new DisallowedError(`robots.txt disallows ${url}`);
     return this.request(url);
   }
@@ -68,6 +72,7 @@ export class PoliteFetcher {
           responseType: 'text',
           timeout: 20_000,
           validateStatus: () => true,
+          maxRedirects: 0, // a redirect could point off-site; treat 3xx as an error
         });
         const status = res.status;
         if (status >= 200 && status < 300) {

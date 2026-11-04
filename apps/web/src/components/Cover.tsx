@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { safeHttpsUrl } from '@/lib/site';
 
 /**
  * Article picture. Default: hotlinked straight from the source (IMAGE_OPTIMIZE unset) — the browser
@@ -24,7 +25,8 @@ export function Cover({
   width?: number;
   sizes?: string;
 }) {
-  if (!src) {
+  const safeSrc = safeHttpsUrl(src);
+  if (!safeSrc) {
     return (
       <div
         aria-hidden="true"
@@ -36,7 +38,7 @@ export function Cover({
   }
   return (
     <Image
-      src={src}
+      src={safeSrc}
       alt={alt ?? ''}
       width={width}
       height={Math.round((width * 9) / 16)}

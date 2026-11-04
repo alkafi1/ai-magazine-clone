@@ -27,8 +27,13 @@ const envSchema = z.object({
 
 const env = envSchema.parse(process.env);
 
-if (env.NODE_ENV === 'production' && env.JWT_SECRET === 'dev-only-secret') {
-  throw new Error('JWT_SECRET must be set in production');
+if (env.NODE_ENV === 'production') {
+  for (const name of ['JWT_SECRET', 'REVALIDATE_SECRET'] as const) {
+    const v = env[name];
+    if (v === 'dev-only-secret' || v.startsWith('change-me') || v.length < 32) {
+      throw new Error(`${name} must be a random string of at least 32 characters in production`);
+    }
+  }
 }
 
 export const config = {

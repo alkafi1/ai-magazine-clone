@@ -1,6 +1,7 @@
-import { SITE } from '@/lib/site';
+import { SITE, safeHttpsUrl } from '@/lib/site';
 
 export function SourceAttribution({ url, author }: { url: string; author?: string | null }) {
+  const href = safeHttpsUrl(url);
   return (
     <aside aria-label="Original source" className="rounded-xl border-2 border-ink bg-card p-5">
       <p className="text-xs font-bold uppercase tracking-widest text-slate">Original reporting</p>
@@ -9,7 +10,7 @@ export function SourceAttribution({ url, author }: { url: string; author?: strin
         <strong>{SITE.sourceName}</strong>.
       </p>
       <a
-        href={url}
+        href={href ?? SITE.sourceUrl}
         target="_blank"
         rel="noopener nofollow"
         className="mt-4 inline-block rounded-md bg-wire px-5 py-3 font-bold text-white hover:bg-wire-dark"

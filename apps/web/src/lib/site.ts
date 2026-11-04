@@ -9,4 +9,14 @@ export const SITE = {
   sourceUrl: 'https://aimagazine.com',
 } as const;
 
+/** Returns the URL only if it is plain https; anything else (javascript:, data:, ...) becomes null. */
+export function safeHttpsUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export const abs = (path: string) => `${SITE.url}${path.startsWith('/') ? path : `/${path}`}`;
