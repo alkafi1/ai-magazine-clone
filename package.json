@@ -27,6 +27,10 @@
     "typescript-eslint": "^8.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,json,md,yml}": "prettier --write"
+    "*.{ts,tsx,js}": [
+      "eslint --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{json,md,yml}": "prettier --write"
   }
 }
