@@ -88,6 +88,15 @@ describe('executeRun', () => {
     expect(sendAlert).toHaveBeenCalledOnce();
   });
 
+  it('alerts when the run finished but the source format looks changed', async () => {
+    runScrape.mockResolvedValue(
+      summary({ warnings: ['Only 10% of pages were read from __NEXT_DATA__'] }),
+    );
+    await executeRun({ trigger: 'cron' });
+    expect(sendAlert).toHaveBeenCalledOnce();
+    expect(sendAlert.mock.calls[0]![0]).toMatch(/format may have changed/);
+  });
+
   it('recovers when a retry succeeds, without alerting', async () => {
     runScrape
       .mockResolvedValueOnce(summary({ status: 'failed', created: 0 }))

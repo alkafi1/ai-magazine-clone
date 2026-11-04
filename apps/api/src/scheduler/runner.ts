@@ -56,6 +56,12 @@ export async function executeRun(
         trigger: opts.trigger,
       });
     }
+    if (summary.warnings?.length && !summary.aborted) {
+      await sendAlert('Source format may have changed: selector check failed', {
+        runId: String(summary.runId),
+        warnings: summary.warnings,
+      });
+    }
     return { started: true, summary, attempts: attempt };
   } finally {
     await releaseLock(LOCK_NAME, owner);

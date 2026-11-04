@@ -12,6 +12,7 @@ type Run = {
   updated: number;
   skipped: number;
   failed: number;
+  warnings?: string[];
   errors: { url?: string; stage: string; message: string; httpStatus?: number }[];
 };
 
@@ -80,6 +81,13 @@ export default async function RunsAdmin({
                   >
                     {r.status}
                   </span>
+                  {r.warnings && r.warnings.length > 0 && (
+                    <ul className="mt-1 max-w-xs space-y-1 text-xs text-yellow-900">
+                      {r.warnings.map((w, i) => (
+                        <li key={i}>⚠ {w}</li>
+                      ))}
+                    </ul>
+                  )}
                 </td>
                 <td className="p-3">{r.urlsFound}</td>
                 <td className="p-3">{r.created}</td>

@@ -15,6 +15,8 @@ const scrapeRunSchema = new Schema({
   skipped: { type: Number, default: 0 },
   failed: { type: Number, default: 0 },
   durationMs: Number,
+  // Source-format health warnings (see scraper/health.ts); empty when all is well.
+  warnings: { type: [String], default: [] },
 });
 // Admin list order, and auto-clean of runs older than 90 days (one TTL index serves both).
 scrapeRunSchema.index({ startedAt: -1 }, { expireAfterSeconds: 90 * 24 * 3600 });

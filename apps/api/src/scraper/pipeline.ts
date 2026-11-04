@@ -3,6 +3,7 @@ import { upsertArticle } from '../db/articles.js';
 import { logger } from '../lib/logger.js';
 import { Article, ScrapeError, ScrapeRun } from '../models/index.js';
 import { BlockedError, FetchError } from './fetcher.js';
+import { assessHealth, emptyStats, recordParsed } from './health.js';
 import { createFetcher, discoverEntries, fetchArticle, StageError } from './run.js';
 
 export type RunOptions = {
@@ -28,6 +29,7 @@ export type RunSummary = {
   newSlugs: string[];
   categorySlugs: string[];
   aborted: boolean;
+  warnings: string[];
 };
 
 /**
@@ -48,7 +50,9 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     newSlugs: [],
     categorySlugs: [],
     aborted: false,
+    warnings: [],
   };
+  const stats = emptyStats();
   const logError = (e: {
     url?: string;
     stage: 'discover' | 'fetch' | 'parse' | 'normalize' | 'save';
@@ -85,7 +89,8 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
         break;
       }
       try {
-        const { article } = await fetchArticle(fetcher, entry);
+        const { article, via } = await fetchArticle(fetcher, entry);
+        recordParsed(stats, article, via);
         const outcome = await upsertArticle(article, run._id);
         if (outcome === 'created') {
           s.created++;
@@ -95,6 +100,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
         else s.skipped++;
       } catch (err) {
         s.failed++;
+        if (err instanceof StageError) stats.parseFailed++;
         const message = err instanceof Error ? err.message : String(err);
         await logError({
           url: entry.loc,
@@ -123,6 +129,9 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     logger.error({ err }, 'scrape run failed');
   }
 
+  s.warnings = assessHealth(stats);
+  if (s.warnings.length) logger.warn({ warnings: s.warnings }, 'source format may have changed');
+
   await ScrapeRun.updateOne(
     { _id: run._id },
     {
@@ -134,6 +143,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
       updated: s.updated,
       skipped: s.skipped,
       failed: s.failed,
+      warnings: s.warnings,
     },
   );
   s.categorySlugs = [...new Set(s.categorySlugs)];
