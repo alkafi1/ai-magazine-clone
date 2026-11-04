@@ -2,7 +2,15 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { logger } from '../../lib/logger.js';
-import { Article, Author, Category, NewsletterSubscriber, Tag } from '../../models/index.js';
+import {
+  Article,
+  Author,
+  Category,
+  Media,
+  NewsletterSubscriber,
+  Page,
+  Tag,
+} from '../../models/index.js';
 import { revalidateWeb } from '../../scheduler/revalidate.js';
 import { config } from '../../config/index.js';
 import { cached, clearCache } from '../middleware/cache.js';
@@ -58,16 +66,23 @@ async function listFilter(q: z.infer<typeof listQuery>) {
 }
 
 const latest = (filter: Record<string, unknown>, limit: number, skip = 0) =>
-  Article.find(filter).sort({ publishedAt: -1 }).skip(skip).limit(limit).populate(populate).lean();
+  Article.find(filter)
+    .select('-body')
+    .sort({ publishedAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate(populate)
+    .lean();
 
 async function trending(limit: number) {
   const since = new Date(Date.now() - 14 * 24 * 3600 * 1000);
   const hot = await Article.find({ ...VISIBLE, publishedAt: { $gte: since } })
     .sort({ viewCount: -1, publishedAt: -1 })
     .limit(limit)
+    .select('-body')
     .populate(populate)
     .lean();
-  return hot.map(publicArticle);
+  return hot.map((a) => publicArticle(a));
 }
 
 export function publicRouter(opts: { newsletterMax: number }) {
@@ -84,12 +99,13 @@ export function publicRouter(opts: { newsletterMax: number }) {
         .sort(sort as Record<string, 1 | -1>)
         .skip((q.page - 1) * q.limit)
         .limit(q.limit)
+        .select('-body')
         .populate(populate)
         .lean(),
       Article.countDocuments(filter),
     ]);
     res.json({
-      items: items.map(publicArticle),
+      items: items.map((a) => publicArticle(a)),
       page: q.page,
       limit: q.limit,
       total,
@@ -101,9 +117,11 @@ export function publicRouter(opts: { newsletterMax: number }) {
     const slug = parse(slugParam, req.params.slug);
     const a = await Article.findOne({ slug }).populate(populate).lean();
     if (!a) throw new HttpError(404, 'not found');
+    // Drafts and scheduled posts do not exist yet as far as the public is concerned.
+    if (a.status === 'draft' || a.status === 'scheduled') throw new HttpError(404, 'not found');
     // Taken-down articles answer 410 so search engines drop them.
     if (a.isHidden || a.status !== 'published') throw new HttpError(410, 'gone');
-    res.json(publicArticle(a));
+    res.json(publicArticle(a, { body: true }));
   });
 
   // Counts a view without being cached; called by the web app when rendering an article page.
@@ -124,15 +142,17 @@ export function publicRouter(opts: { newsletterMax: number }) {
     })
       .sort({ publishedAt: -1 })
       .limit(6)
+      .select('-body')
       .populate(populate)
       .lean();
-    res.json({ items: related.map(publicArticle) });
+    res.json({ items: related.map((a) => publicArticle(a)) });
   });
 
   r.get('/home', cached(60), async (_req, res) => {
     const featured = await Article.find({ ...VISIBLE, isFeatured: true })
       .sort({ publishedAt: -1 })
       .limit(5)
+      .select('-body')
       .populate(populate)
       .lean();
     const recent = await latest(VISIBLE, 20);
@@ -152,15 +172,15 @@ export function publicRouter(opts: { newsletterMax: number }) {
       await Promise.all(
         cats.map(async (c) => ({
           category: { name: c.name, slug: c.slug },
-          items: (await latest({ ...VISIBLE, category: c._id }, 4)).map(publicArticle),
+          items: (await latest({ ...VISIBLE, category: c._id }, 4)).map((a) => publicArticle(a)),
         })),
       )
     ).filter((s) => s.items.length > 0);
 
     res.json({
       hero: hero ? publicArticle(hero) : null,
-      featured: featuredRest.map(publicArticle),
-      latest: latestList.map(publicArticle),
+      featured: featuredRest.map((a) => publicArticle(a)),
+      latest: latestList.map((a) => publicArticle(a)),
       sections,
       trending: await trending(5),
     });
@@ -187,6 +207,39 @@ export function publicRouter(opts: { newsletterMax: number }) {
   r.get('/tags', cached(300), async (_req, res) => {
     const tags = await Tag.find().sort({ name: 1 }).limit(200).lean();
     res.json({ items: tags.map((t) => ({ name: t.name, slug: t.slug })) });
+  });
+
+  // Uploaded images (logo, favicon, article covers). Immutable: a new upload gets a new id.
+  r.get('/media/:id', async (req, res) => {
+    const id = parse(z.string().regex(/^[a-f0-9]{24}$/), req.params.id);
+    const m = await Media.findById(id); // not lean(): we want a Buffer, not a BSON Binary
+    if (!m) throw new HttpError(404, 'not found');
+    res.setHeader('Content-Type', m.mime);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // An SVG opened directly could run script; sandboxing it makes that impossible. <img> use is unaffected.
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    );
+    res.send(m.data);
+  });
+
+  r.get('/pages/:slug', cached(60), async (req, res) => {
+    const slug = parse(slugParam, req.params.slug);
+    const p = await Page.findOne({ slug, status: 'published' }).lean();
+    if (!p) throw new HttpError(404, 'not found');
+    res.json({
+      slug: p.slug,
+      title: p.title,
+      body: p.body,
+      seo: {
+        metaTitle: p.seo?.metaTitle ?? null,
+        metaDescription: p.seo?.metaDescription ?? null,
+        noindex: !!p.seo?.noindex,
+      },
+      updatedAt: p.updatedAt,
+    });
   });
 
   // Everything the public site needs from admin settings (announcement, ads, analytics, social, flags).
@@ -251,15 +304,17 @@ export function publicRouter(opts: { newsletterMax: number }) {
   });
 
   r.get('/sitemap/pages', cached(300), async (_req, res) => {
-    const [categories, tags, authors] = await Promise.all([
+    const [categories, tags, authors, pages] = await Promise.all([
       Category.find({}, 'slug').lean(),
       Tag.find({}, 'slug').lean(),
       Author.find({}, 'slug').lean(),
+      Page.find({ status: 'published', 'seo.noindex': { $ne: true } }, 'slug').lean(),
     ]);
     res.json({
       categories: categories.map((c) => c.slug),
       tags: tags.map((t) => t.slug),
       authors: authors.map((a) => a.slug),
+      pages: pages.map((p) => p.slug),
     });
   });
 
@@ -292,11 +347,18 @@ export function publicRouter(opts: { newsletterMax: number }) {
         .sort({ score: { $meta: 'textScore' } })
         .skip((q.page - 1) * q.limit)
         .limit(q.limit)
+        .select('-body')
         .populate(populate)
         .lean(),
       Article.countDocuments(filter),
     ]);
-    res.json({ items: items.map(publicArticle), page: q.page, limit: q.limit, total, query: q.q });
+    res.json({
+      items: items.map((a) => publicArticle(a)),
+      page: q.page,
+      limit: q.limit,
+      total,
+      query: q.q,
+    });
   });
 
   r.get('/trending', cached(300), async (_req, res) => {

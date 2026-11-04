@@ -9,6 +9,8 @@ const envSchema = z.object({
   // How many reverse proxies sit in front (Nginx, or the Next server forwarding the visitor's IP). Default 1.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10), // attempts per 15 min per IP
+  // Public base URL of this API as browsers reach it (for uploaded-image URLs). Same origin as the site behind nginx.
+  PUBLIC_API_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().default('http://localhost:3100'),
   JWT_SECRET: z.string().default('dev-only-secret'),
   REVALIDATE_SECRET: z.string().default('dev-only-secret'),
@@ -46,6 +48,7 @@ export const config = {
   port: env.API_PORT,
   trustProxyHops: env.TRUST_PROXY_HOPS ?? 1,
   loginRateLimitMax: env.LOGIN_RATE_LIMIT_MAX,
+  publicApiUrl: (env.PUBLIC_API_URL ?? `http://localhost:${env.API_PORT}`).replace(/\/$/, ''),
   corsOrigins: env.CORS_ORIGINS.split(',').map((s) => s.trim()),
   jwtSecret: env.JWT_SECRET,
   revalidateSecret: env.REVALIDATE_SECRET,

@@ -22,6 +22,7 @@ import { clearCache } from '../middleware/cache.js';
 import { HttpError, parse } from '../middleware/error.js';
 import { limit, objectId, page } from '../validators.js';
 import { adminMiscRouter } from './admin-misc.js';
+import { adminContentRouter } from './admin-content.js';
 import { adminRolesRouter } from './admin-roles.js';
 import { adminUsersRouter } from './admin-users.js';
 
@@ -152,6 +153,7 @@ export function adminRouter(opts: { loginMax: number }) {
 
   r.use('/users', adminUsersRouter());
   r.use('/roles', adminRolesRouter());
+  r.use(adminContentRouter());
   r.use(adminMiscRouter());
 
   // ---- articles -----------------------------------------------------------------------------
@@ -163,6 +165,8 @@ export function adminRouter(opts: { loginMax: number }) {
         q: z.string().trim().max(100).optional(),
         hidden: z.enum(['true', 'false']).optional(),
         featured: z.enum(['true', 'false']).optional(),
+        kind: z.enum(['scraped', 'original']).optional(),
+        status: z.enum(['draft', 'scheduled', 'published', 'hidden']).optional(),
         category: z
           .string()
           .regex(/^[a-z0-9-]{1,120}$/)
@@ -174,6 +178,8 @@ export function adminRouter(opts: { loginMax: number }) {
     if (q.q) filter.$text = { $search: q.q };
     if (q.hidden) filter.isHidden = q.hidden === 'true';
     if (q.featured) filter.isFeatured = q.featured === 'true';
+    if (q.kind) filter.kind = q.kind;
+    if (q.status) filter.status = q.status;
     if (q.category) {
       const c = await Category.findOne({ slug: q.category }, '_id').lean();
       filter.category = c?._id ?? null;
@@ -190,11 +196,12 @@ export function adminRouter(opts: { loginMax: number }) {
     res.json({
       items: items.map((a) => ({
         id: String(a._id),
+        kind: a.kind ?? 'scraped',
         title: a.title,
         slug: a.slug,
         category: (a.category as unknown as { name?: string })?.name ?? null,
         publishedAt: a.publishedAt,
-        sourceUrl: a.sourceUrl,
+        sourceUrl: a.sourceUrl ?? null,
         isHidden: a.isHidden,
         isFeatured: a.isFeatured,
         status: a.status,
@@ -212,10 +219,23 @@ export function adminRouter(opts: { loginMax: number }) {
     const a = await Article.findById(id)
       .populate('category', 'name slug')
       .populate('author', 'name slug')
+      .populate('tags', 'name')
       .lean();
     if (!a) throw new HttpError(404, 'not found');
+    const original = a.kind === 'original';
     res.json({
       id: String(a._id),
+      kind: a.kind ?? 'scraped',
+      ...(original
+        ? {
+            body: a.body ?? '',
+            categoryId: String((a.category as unknown as { _id?: unknown })?._id ?? ''),
+            tags: ((a.tags ?? []) as unknown as { name: string }[]).map((t) => t.name),
+            coverMediaId: a.imageMedia ? String(a.imageMedia) : null,
+            coverUrl: a.imageUrl ?? null,
+            imageAlt: a.imageAlt ?? '',
+          }
+        : {}),
       title: a.title,
       slug: a.slug,
       excerpt: a.excerpt,
@@ -223,7 +243,7 @@ export function adminRouter(opts: { loginMax: number }) {
       author: (a.author as unknown as { name?: string })?.name ?? null,
       publishedAt: a.publishedAt,
       scrapedAt: a.scrapedAt,
-      sourceUrl: a.sourceUrl,
+      sourceUrl: a.sourceUrl ?? null,
       isHidden: a.isHidden,
       isFeatured: a.isFeatured,
       status: a.status,
@@ -314,18 +334,26 @@ export function adminRouter(opts: { loginMax: number }) {
     res.json({ matched: result.matchedCount, modified: result.modifiedCount });
   });
 
-  // Takedown, not a hard delete: the row stays (hidden, 410) so the scraper does not re-import it.
-  r.delete('/articles/:id', requirePermission('articles.moderate'), async (req, res) => {
+  // Aggregated stories are taken down, not deleted: the row stays (hidden, 410) so the scraper does not
+  // re-import them. Our own articles are deleted for real (needs articles.write).
+  r.delete('/articles/:id', async (req, res) => {
     const id = parse(objectId, req.params.id);
-    const a = await Article.findByIdAndUpdate(
-      id,
-      { $set: { isHidden: true, isFeatured: false, status: 'hidden' } },
-      { returnDocument: 'after' },
-    ).lean();
-    if (!a) throw new HttpError(404, 'not found');
-    await audit(req, 'article.takedown', String(a._id), { title: a.title });
+    const existing = await Article.findById(id, 'kind slug title').lean();
+    if (!existing) throw new HttpError(404, 'not found');
+    if (existing.kind === 'original') {
+      need(req, 'articles.write');
+      await Article.deleteOne({ _id: id });
+      await audit(req, 'article.delete', String(id), { title: existing.title });
+    } else {
+      need(req, 'articles.moderate');
+      await Article.updateOne(
+        { _id: id },
+        { $set: { isHidden: true, isFeatured: false, status: 'hidden' } },
+      );
+      await audit(req, 'article.takedown', String(id), { title: existing.title });
+    }
     clearCache();
-    void revalidateWeb({ articleSlugs: [a.slug] });
+    void revalidateWeb({ articleSlugs: [existing.slug] });
     res.status(204).end();
   });
 

@@ -5,6 +5,7 @@ import { seedCategories } from './db/seed.js';
 import { createApp } from './http/app.js';
 import { logger } from './lib/logger.js';
 import { startScheduler, stopScheduler } from './scheduler/index.js';
+import { startPublisher, stopPublisher } from './scheduler/publisher.js';
 import { recoverStaleRuns } from './scheduler/runner.js';
 
 await connectDb();
@@ -15,6 +16,7 @@ const server = createApp().listen(config.port, () =>
   logger.info({ port: config.port }, 'api listening'),
 );
 startScheduler();
+startPublisher(); // scheduled articles go live on time, independent of the scraper schedule
 
 let closing = false;
 async function close(signal: string) {
@@ -22,6 +24,7 @@ async function close(signal: string) {
   closing = true;
   logger.info({ signal }, 'shutting down');
   server.close();
+  stopPublisher();
   await stopScheduler();
   await disconnectDb();
   process.exit(0);
