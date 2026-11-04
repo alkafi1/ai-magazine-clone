@@ -4,7 +4,9 @@ import type { NextConfig } from 'next';
 // One shared .env at the repo root (ignored if missing, e.g. in Docker where env vars are injected).
 try {
   process.loadEnvFile(resolve(process.cwd(), '../../.env'));
-} catch {}
+} catch {
+  // no root .env file: rely on the real environment
+}
 
 const config: NextConfig = {
   // Only used when IMAGE_OPTIMIZE=true (see components/Cover.tsx).
