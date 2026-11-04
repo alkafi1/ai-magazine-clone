@@ -23,7 +23,7 @@ const listQuery = z.object({
   category: slugParam.optional(),
   tag: slugParam.optional(),
   author: slugParam.optional(),
-  page: z.coerce.number().int().min(1).max(1000).default(1),
+  page: z.coerce.number().int().min(1).max(500).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(12),
   sort: z.enum(['latest', 'popular']).default('latest'),
 });

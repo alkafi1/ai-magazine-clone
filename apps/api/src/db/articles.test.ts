@@ -98,6 +98,9 @@ describe('models', () => {
       { isFeatured: 1, publishedAt: -1 },
       { isHidden: 1, status: 1, publishedAt: -1 },
       { tags: 1, publishedAt: -1 },
+      { author: 1, publishedAt: -1 },
+      { isHidden: 1, status: 1, viewCount: -1, publishedAt: -1 },
+      { publishedAt: -1 },
     ]) {
       expect(keys).toContain(JSON.stringify(k));
     }

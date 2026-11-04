@@ -44,6 +44,10 @@ articleSchema.index({ isFeatured: 1, publishedAt: -1 });
 articleSchema.index({ isHidden: 1, status: 1, publishedAt: -1 });
 articleSchema.index({ title: 'text', excerpt: 'text' });
 articleSchema.index({ tags: 1, publishedAt: -1 });
+// Added after the query-plan review (pnpm db:explain), beyond the original PLAN.md table:
+articleSchema.index({ author: 1, publishedAt: -1 }); // author pages
+articleSchema.index({ isHidden: 1, status: 1, viewCount: -1, publishedAt: -1 }); // sort=popular
+articleSchema.index({ publishedAt: -1 }); // admin list (no visibility filter)
 
 export type ArticleDoc = InferSchemaType<typeof articleSchema>;
 export const Article = model('Article', articleSchema);

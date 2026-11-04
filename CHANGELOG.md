@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Phase 7: security hardening, selector-break detection (run warnings + alert), query-plan review with 3 new indexes.
 - Fix: manual runs now honour graceful shutdown; stale `running` runs are recovered at startup.
 - Phase 6: admin panel (login via httpOnly cookie, dashboard, article moderation + SEO overrides + takedown, scrape runs, manual run).
 - Phase 5: Next.js frontend (Synthwire brand), ISR + on-demand revalidation, full SEO (metadata, JSON-LD, sitemaps, news sitemap, robots, RSS, OG cards), thumbnails, optional image optimizer.

@@ -13,7 +13,8 @@
     "seed": "tsx src/db/seed-cli.ts",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "create-admin": "tsx src/db/create-admin.ts"
+    "create-admin": "tsx src/db/create-admin.ts",
+    "db:explain": "tsx src/db/explain.ts"
   },
   "dependencies": {
     "@aimag/shared": "workspace:*",
