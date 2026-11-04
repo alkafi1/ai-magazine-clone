@@ -20,7 +20,7 @@ export const viewport: Viewport = { themeColor: '#0c1222', width: 'device-width'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   );

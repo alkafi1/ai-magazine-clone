@@ -20,7 +20,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: page > 1 ? `${cat.name} — page ${page}` : cat.name,
     description,
-    alternates: { canonical: pagePath(`/category/${slug}`, page) },
+    alternates: {
+      canonical: pagePath(`/category/${slug}`, page),
+      types: { 'application/rss+xml': `/category/${slug}/feed.xml` },
+    },
     openGraph: { title: cat.name, description, url: pagePath(`/category/${slug}`, page) },
   };
 }

@@ -1,3 +1,9 @@
+import {
+  toPublicConfig,
+  defaultAdsSettings,
+  defaultSiteSettings,
+  type PublicConfig,
+} from '@aimag/shared';
 import type { Article, Category, HomeData, Paged, Ref } from './types';
 
 const API = (process.env.API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
@@ -74,3 +80,15 @@ export const getSitemapNews = async () =>
   )?.items ?? [];
 export const getSitemapPages = () =>
   get<{ categories: string[]; tags: string[]; authors: string[] }>('/api/sitemap/pages', ['home']);
+
+/** Admin-controlled settings (announcement, ads, analytics, social, flags). Falls back to safe defaults if the API is down. */
+export async function getSiteConfig(): Promise<PublicConfig> {
+  try {
+    return (
+      (await get<PublicConfig>('/api/site-config', ['settings'], 60)) ??
+      toPublicConfig(defaultSiteSettings(), defaultAdsSettings())
+    );
+  } catch {
+    return toPublicConfig(defaultSiteSettings(), defaultAdsSettings());
+  }
+}

@@ -1,4 +1,5 @@
 import { abs } from '@/lib/site';
+import { CopyLink } from './CopyLink';
 
 export function ShareButtons({ path, title }: { path: string; title: string }) {
   const url = encodeURIComponent(abs(path));
@@ -9,7 +10,7 @@ export function ShareButtons({ path, title }: { path: string; title: string }) {
     ['Email', `mailto:?subject=${text}&body=${url}`],
   ] as const;
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="font-semibold text-slate">Share:</span>
       {items.map(([label, href]) => (
         <a
@@ -22,6 +23,7 @@ export function ShareButtons({ path, title }: { path: string; title: string }) {
           {label}
         </a>
       ))}
+      <CopyLink url={abs(path)} />
     </div>
   );
 }

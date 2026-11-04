@@ -6,7 +6,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   MONGODB_URI: z.string().default('mongodb://localhost:27017/aimag'),
   API_PORT: z.coerce.number().default(4000),
-  // How many reverse proxies sit in front (Nginx, or the Next server forwarding the visitor's IP). 0 = none.
+  // How many reverse proxies sit in front (Nginx, or the Next server forwarding the visitor's IP). Default 1.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   CORS_ORIGINS: z.string().default('http://localhost:3100'),
   JWT_SECRET: z.string().default('dev-only-secret'),
@@ -43,7 +43,7 @@ export const config = {
   logLevel: env.LOG_LEVEL,
   mongoUri: env.MONGODB_URI,
   port: env.API_PORT,
-  trustProxyHops: env.TRUST_PROXY_HOPS ?? (env.NODE_ENV === 'production' ? 1 : 0),
+  trustProxyHops: env.TRUST_PROXY_HOPS ?? 1,
   corsOrigins: env.CORS_ORIGINS.split(',').map((s) => s.trim()),
   jwtSecret: env.JWT_SECRET,
   revalidateSecret: env.REVALIDATE_SECRET,

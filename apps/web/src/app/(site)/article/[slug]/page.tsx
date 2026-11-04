@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArticleCard } from '@/components/ArticleCard';
+import { Ad } from '@/components/ads/Ad';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Cover } from '@/components/Cover';
 import { JsonLd } from '@/components/JsonLd';
@@ -103,10 +104,12 @@ export default async function ArticlePage({ params }: Props) {
               <figcaption className="mt-2 text-xs text-slate">{a.imageAlt}</figcaption>
             )}
           </figure>
+          <Ad slot="articleTop" className="mt-6" />
           <p className="mt-6 font-display text-xl leading-relaxed text-ink">{a.excerpt}</p>
           <div className="mt-8">
             <SourceAttribution url={a.sourceUrl} author={a.author?.name} />
           </div>
+          <Ad slot="articleBottom" className="mt-6" />
           {a.tags.length > 0 && (
             <ul className="mt-6 flex flex-wrap gap-2" aria-label="Tags">
               {a.tags.map((t) => (

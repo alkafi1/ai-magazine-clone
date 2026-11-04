@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ArticleCard } from '@/components/ArticleCard';
 import { Trending } from '@/components/Trending';
+import { Ad, inFeedEvery } from '@/components/ads/Ad';
 import { getHome } from '@/lib/api';
 import { SITE } from '@/lib/site';
 import Link from 'next/link';
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const data = await getHome().catch(() => null);
+  const [data, every] = await Promise.all([getHome().catch(() => null), inFeedEvery()]);
 
   if (!data || !data.hero) {
     return (
@@ -53,11 +54,15 @@ export default async function HomePage() {
               All stories →
             </Link>
           </div>
-          {data.latest.map((a) => (
-            <ArticleCard key={a.id} article={a} variant="list" />
-          ))}
+          {data.latest.flatMap((a, i) => [
+            <ArticleCard key={a.id} article={a} variant="list" />,
+            every > 0 && (i + 1) % every === 0 && i < data.latest.length - 1 ? (
+              <Ad key={`ad-${a.id}`} slot="inFeed" className="border-b border-mist py-4" />
+            ) : null,
+          ])}
         </section>
         <aside className="space-y-8 lg:col-span-4">
+          <Ad slot="sidebar" />
           <Trending items={data.trending} />
         </aside>
       </div>

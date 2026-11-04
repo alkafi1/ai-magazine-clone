@@ -17,7 +17,7 @@ export function Logo({ light = false }: { light?: boolean }) {
         <circle cx="54" cy="38" r="4.5" fill="#ffb703" />
       </svg>
       <span
-        className={`font-display text-2xl font-extrabold tracking-tight ${light ? 'text-paper' : 'text-ink'}`}
+        className={`font-display text-2xl font-extrabold tracking-tight ${light ? 'text-snow' : 'text-ink'}`}
       >
         {SITE.name}
       </span>

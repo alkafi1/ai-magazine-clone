@@ -30,9 +30,9 @@ export function Cover({
     return (
       <div
         aria-hidden="true"
-        className={`flex aspect-[16/9] items-end bg-gradient-to-br from-ink via-ink-soft to-wire p-4 ${className}`}
+        className={`flex aspect-[16/9] items-end bg-gradient-to-br from-night via-night-soft to-wire p-4 ${className}`}
       >
-        <span className="font-display text-lg font-bold text-paper/90">{label}</span>
+        <span className="font-display text-lg font-bold text-snow/90">{label}</span>
       </div>
     );
   }

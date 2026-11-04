@@ -42,12 +42,12 @@ export function NewsletterForm() {
         required
         autoComplete="email"
         placeholder="you@example.com"
-        className="min-w-0 flex-1 rounded-md bg-paper px-3 py-2 text-ink placeholder:text-slate"
+        className="min-w-0 flex-1 rounded-md bg-snow px-3 py-2 text-night placeholder:text-slate"
       />
       <button
         type="submit"
         disabled={state === 'sending'}
-        className="rounded-md bg-signal px-4 py-2 font-bold text-ink hover:brightness-95 disabled:opacity-60"
+        className="rounded-md bg-signal px-4 py-2 font-bold text-night hover:brightness-95 disabled:opacity-60"
       >
         Subscribe
       </button>

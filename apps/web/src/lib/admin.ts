@@ -1,5 +1,7 @@
 import 'server-only';
+import type { Permission, Role } from '@aimag/shared';
 import { cookies, headers } from 'next/headers';
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 
 const API = (process.env.API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
@@ -58,3 +60,24 @@ export async function adminLogin(
   if (!res.ok) return null;
   return (await res.json()) as { token: string };
 }
+
+export type Me = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  permissions: Permission[];
+  assignableRoles: Role[];
+};
+
+/** The signed-in admin. Memoised per request, so layout and page share one API call. */
+export const getMe = cache(() => adminApi<Me>('/me'));
+
+/** Page guard: sends users without `permission` to the 403 page. Returns the current admin. */
+export async function guard(permission: Permission): Promise<Me> {
+  const me = await getMe();
+  if (!me.permissions.includes(permission)) redirect('/admin/forbidden');
+  return me;
+}
+
+export const can = (me: Me, permission: Permission) => me.permissions.includes(permission);

@@ -9,6 +9,7 @@ export async function GET() {
   const paths = [
     '/',
     '/latest',
+    '/topics',
     '/about',
     '/contact',
     '/privacy',

@@ -1,10 +1,11 @@
 import type { Article } from '@/lib/types';
+import { Ad, inFeedEvery } from './ads/Ad';
 import { ArticleCard } from './ArticleCard';
 import { Breadcrumbs } from './Breadcrumbs';
 import { Pagination } from './Pagination';
 
 /** Shared layout for category / tag / author / latest pages. */
-export function Listing({
+export async function Listing({
   title,
   intro,
   crumbs,
@@ -21,6 +22,7 @@ export function Listing({
   page: number;
   totalPages: number;
 }) {
+  const every = await inFeedEvery();
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <Breadcrumbs items={crumbs} />
@@ -31,15 +33,20 @@ export function Listing({
       ) : (
         <>
           <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((a, i) => (
+            {items.flatMap((a, i) => [
               <ArticleCard
                 key={a.id}
                 article={a}
                 variant="large"
                 heading="h2"
                 priority={page === 1 && i < 2}
-              />
-            ))}
+              />,
+              every > 0 && (i + 1) % every === 0 && i < items.length - 1 ? (
+                <div key={`ad-${a.id}`} className="col-span-full">
+                  <Ad slot="inFeed" />
+                </div>
+              ) : null,
+            ])}
           </div>
           <Pagination base={base} page={page} totalPages={totalPages} />
         </>

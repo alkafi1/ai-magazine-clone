@@ -1,25 +1,27 @@
 import Link from 'next/link';
-import { getCategories } from '@/lib/api';
+import { getCategories, getSiteConfig } from '@/lib/api';
 import { SITE } from '@/lib/site';
 import { formatDate } from '@/lib/format';
 import { Logo } from './Logo';
 import { SearchBox } from './SearchBox';
+import { ThemeToggle } from './ThemeToggle';
 
 const navLink =
-  'rounded px-3 py-2 text-sm font-semibold text-ink hover:bg-mist/60 hover:text-wire-dark';
+  'whitespace-nowrap rounded px-3 py-2 text-sm font-semibold text-ink hover:bg-mist/60 hover:text-wire-dark';
 
 export async function Header() {
+  const cfg = await getSiteConfig();
   const categories = (await getCategories().catch(() => [])).filter(
     (c) => c.showInMenu && c.articleCount > 0,
   );
-  const primary = categories.slice(0, 5);
+  const primary = categories.slice(0, 4); // the rest live under "Topics"
 
   return (
     <>
       <a href="#main" className="skip-link">
         Skip to content
       </a>
-      <div className="bg-ink text-xs text-paper/80">
+      <div className="bg-night text-xs text-snow/80">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5">
           <span>{formatDate(new Date().toISOString())}</span>
           <span className="hidden sm:inline">{SITE.tagline}</span>
@@ -56,9 +58,20 @@ export async function Header() {
                     </li>
                   ))}
                 </ul>
+                <Link
+                  href="/topics"
+                  className="mt-4 inline-block text-sm font-semibold text-wire-dark hover:underline"
+                >
+                  All topics →
+                </Link>
               </div>
             </details>
           </nav>
+          {cfg.features.darkModeToggle && (
+            <div className="ml-auto md:ml-0 md:order-last">
+              <ThemeToggle />
+            </div>
+          )}
           <div className="ml-auto hidden w-64 md:block">
             <SearchBox />
           </div>

@@ -8,7 +8,7 @@ type Variant = 'hero' | 'large' | 'small' | 'list';
 function Meta({ a, light = false }: { a: Article; light?: boolean }) {
   return (
     <p
-      className={`flex flex-wrap items-center gap-x-2 text-xs ${light ? 'text-paper/75' : 'text-slate'}`}
+      className={`flex flex-wrap items-center gap-x-2 text-xs ${light ? 'text-snow/75' : 'text-slate'}`}
     >
       {a.category && (
         <Link
@@ -40,7 +40,7 @@ export function ArticleCard({
 
   if (variant === 'hero') {
     return (
-      <article className="group relative overflow-hidden rounded-xl bg-ink text-paper">
+      <article className="group relative overflow-hidden rounded-xl bg-night text-snow">
         <Cover
           src={a.imageUrl}
           alt={a.imageAlt}
@@ -49,14 +49,14 @@ export function ArticleCard({
           sizes="(min-width: 1024px) 800px, 100vw"
           className="opacity-80 transition group-hover:opacity-95 md:aspect-[16/10]"
         />
-        <div className="space-y-3 p-5 md:absolute md:inset-x-0 md:bottom-0 md:bg-gradient-to-t md:from-ink md:via-ink/85 md:to-transparent md:p-8 md:pt-24">
+        <div className="space-y-3 p-5 md:absolute md:inset-x-0 md:bottom-0 md:bg-gradient-to-t md:from-night md:via-night/85 md:to-transparent md:p-8 md:pt-24">
           <Meta a={a} light />
           <h2 className="font-display text-2xl font-extrabold leading-tight md:text-4xl">
             <Link href={href} className="after:absolute after:inset-0 hover:underline">
               {a.title}
             </Link>
           </h2>
-          <p className="max-w-2xl text-paper/85">{a.excerpt}</p>
+          <p className="max-w-2xl text-snow/85">{a.excerpt}</p>
         </div>
       </article>
     );

@@ -8,6 +8,10 @@
   --color-card: #ffffff;
   --color-mist: #e6e1d6;
   --color-slate: #4a5468;
+  /* Always-dark surfaces (footer, top bar, hero cards): do not flip with the theme. */
+  --color-night: #0c1222;
+  --color-night-soft: #1a2238;
+  --color-snow: #faf8f3;
   --color-wire: #5b3df5;
   --color-wire-dark: #4528d6;
   --color-signal: #ffb703;
@@ -49,4 +53,26 @@ body {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Dark theme: swap the page tokens. Fixed-dark surfaces use night/snow and are unaffected. */
+.dark {
+  --color-ink: #f2efe7;
+  --color-paper: #0b1020;
+  --color-card: #131a2e;
+  --color-mist: #263049;
+  --color-slate: #a3aec4;
+  color-scheme: dark;
+}
+.dark .text-wire-dark {
+  color: #b9adff;
+}
+/* Admin stays light even if the visitor chose dark mode on the public site. */
+.force-light {
+  --color-ink: #0c1222;
+  --color-paper: #faf8f3;
+  --color-card: #ffffff;
+  --color-mist: #e6e1d6;
+  --color-slate: #4a5468;
+  color-scheme: light;
 }
