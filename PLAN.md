@@ -371,7 +371,7 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 6: Admin panel (3-4 days)
 
-- [ ] Login, dashboard stats, article moderation, scrape run table, manual run
+- [x] Login, dashboard stats, article moderation, scrape run table, manual run
 
 ### Phase 7: QA and hardening (2-3 days)
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Phase 6: admin panel (login via httpOnly cookie, dashboard, article moderation + SEO overrides + takedown, scrape runs, manual run).
 - Phase 5: Next.js frontend (Synthwire brand), ISR + on-demand revalidation, full SEO (metadata, JSON-LD, sitemaps, news sitemap, robots, RSS, OG cards), thumbnails, optional image optimizer.
 - Phase 4: public + admin REST API (zod, helmet, CORS allowlist, rate limits, cache, JWT admin, takedown flow) with Supertest tests.
 - Phase 3: cron scheduler (6h), Mongo overlap lock, retry + alert webhook, graceful shutdown, manual trigger, Next.js revalidation call.

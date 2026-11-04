@@ -121,6 +121,36 @@ export function adminRouter(opts: { loginMax: number }) {
     });
   });
 
+  r.get('/articles/:id', async (req, res) => {
+    const id = parse(objectId, req.params.id);
+    const a = await Article.findById(id)
+      .populate('category', 'name slug')
+      .populate('author', 'name slug')
+      .lean();
+    if (!a) throw new HttpError(404, 'not found');
+    res.json({
+      id: String(a._id),
+      title: a.title,
+      slug: a.slug,
+      excerpt: a.excerpt,
+      category: (a.category as unknown as { name?: string })?.name ?? null,
+      author: (a.author as unknown as { name?: string })?.name ?? null,
+      publishedAt: a.publishedAt,
+      scrapedAt: a.scrapedAt,
+      sourceUrl: a.sourceUrl,
+      isHidden: a.isHidden,
+      isFeatured: a.isFeatured,
+      status: a.status,
+      viewCount: a.viewCount,
+      seo: {
+        metaTitle: a.seo?.metaTitle ?? null,
+        metaDescription: a.seo?.metaDescription ?? null,
+        ogImage: a.seo?.ogImage ?? null,
+        noindex: !!a.seo?.noindex,
+      },
+    });
+  });
+
   r.patch('/articles/:id', async (req, res) => {
     const id = parse(objectId, req.params.id);
     const body = parse(patchBody, req.body);

@@ -54,7 +54,7 @@ pnpm --filter @aimag/web build && pnpm --filter @aimag/web start
 ```
 
 - Pages: `/`, `/latest`, `/category/:slug`, `/tag/:slug`, `/author/:slug` (all paginated as `/page/2`), `/article/:slug`,
-  `/search` (noindex), `/about`, `/contact`, `/privacy`, `/terms`, `/dmca`, 404. Admin comes in Phase 6.
+  `/search` (noindex), `/about`, `/contact`, `/privacy`, `/terms`, `/dmca`, 404.
 - Rendering: ISR (`revalidate` 120s home, 300s elsewhere) plus on-demand `POST /api/revalidate` (secret header),
   called by the API after each scrape. Tags: `home`, `category:<slug>`, `article:<slug>`, `categories`, `latest`.
 - SEO: `generateMetadata` on every page, canonical URLs, OG/Twitter tags with a generated branded card at
@@ -65,6 +65,16 @@ pnpm --filter @aimag/web build && pnpm --filter @aimag/web start
 - Removed/unknown stories render the 404 page (App Router pages cannot send 410; the API does return 410 and
   Nginx can map it in Phase 8).
 - Client JS is limited to the newsletter form and a view beacon; the menu uses `<details>`.
+
+### Admin panel
+
+`http://localhost:3100/admin` (create a user first: `pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'`).
+Dashboard stats, article moderation (search, filter, feature, hide/restore, takedown, per-article SEO overrides and
+noindex), and scrape runs (history, per-run errors, **Run now**). Sign-in stores the API's JWT in an
+`httpOnly`, `SameSite=Strict` cookie scoped to `/admin` (12h), so page scripts never see it; `proxy.ts` redirects
+visitors without the cookie and every API call re-verifies the token (401 -> back to login). Admin pages are
+`noindex`, `no-store` and disallowed in robots.txt. Behind a reverse proxy, make it set `X-Forwarded-For` to the
+real client IP so the API's login rate limit (10 tries / 15 min / IP) is per visitor.
 
 ### Images and Lighthouse (decision needed)
 

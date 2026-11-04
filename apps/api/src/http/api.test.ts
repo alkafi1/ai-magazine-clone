@@ -275,6 +275,25 @@ describe('admin API', () => {
       .expect(400);
   });
 
+  it('returns one article for editing', async () => {
+    await login();
+    const res = await request(app)
+      .get(`/api/admin/articles/${ids.a1}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body).toMatchObject({
+      slug: 'article-1',
+      category: 'AI Strategy',
+      author: 'Adam Pond',
+      isFeatured: true,
+    });
+    await request(app).get(`/api/admin/articles/${ids.a1}`).expect(401);
+    await request(app)
+      .get('/api/admin/articles/zzz')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+  });
+
   it('takes an article down on DELETE but keeps the record', async () => {
     await login();
     await request(app)
