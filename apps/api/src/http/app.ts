@@ -12,8 +12,9 @@ export type AppOptions = { loginMax?: number; newsletterMax?: number; globalMax?
 export function createApp(opts: AppOptions = {}) {
   const app = express();
   app.disable('x-powered-by');
-  // Behind Nginx in production: trust the first proxy so rate limits see the real client IP.
-  if (config.env === 'production') app.set('trust proxy', 1);
+  // Behind Nginx (and the Next server, which forwards the visitor's IP): trust that many proxy hops so
+  // rate limits see the real client IP. Only safe when the API is not directly reachable by clients.
+  if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
 
   // CORP cross-origin: the web app (another origin) sends view beacons to this API.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));

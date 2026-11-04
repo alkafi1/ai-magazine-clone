@@ -27,6 +27,8 @@ const csp = [
 ].join('; ');
 
 const config: NextConfig = {
+  // The e2e suite builds into its own dir so it never clobbers a running dev/prod build.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // Only used when IMAGE_OPTIMIZE=true (see components/Cover.tsx).
   images: {
     remotePatterns: [{ protocol: 'https', hostname: 'assets.bizclikmedia.net' }],

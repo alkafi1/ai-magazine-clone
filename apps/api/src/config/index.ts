@@ -7,6 +7,8 @@ const envSchema = z.object({
   MONGODB_URI: z.string().default('mongodb://localhost:27017/aimag'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   API_PORT: z.coerce.number().default(4000),
+  // How many reverse proxies sit in front (Nginx, or the Next server forwarding the visitor's IP). 0 = none.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   CORS_ORIGINS: z.string().default('http://localhost:3100'),
   JWT_SECRET: z.string().default('dev-only-secret'),
   REVALIDATE_SECRET: z.string().default('dev-only-secret'),
@@ -42,6 +44,7 @@ export const config = {
   mongoUri: env.MONGODB_URI,
   redisUrl: env.REDIS_URL,
   port: env.API_PORT,
+  trustProxyHops: env.TRUST_PROXY_HOPS ?? (env.NODE_ENV === 'production' ? 1 : 0),
   corsOrigins: env.CORS_ORIGINS.split(',').map((s) => s.trim()),
   jwtSecret: env.JWT_SECRET,
   revalidateSecret: env.REVALIDATE_SECRET,

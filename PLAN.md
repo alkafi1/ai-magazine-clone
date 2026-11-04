@@ -375,9 +375,9 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 7: QA and hardening (2-3 days)
 
-- [ ] E2E tests, selector-break detection and alerting
-- [ ] Security review (headers, rate limits, auth)
-- [ ] DB/query performance review
+- [x] E2E tests, selector-break detection and alerting
+- [x] Security review (headers, rate limits, auth)
+- [x] DB/query performance review
 
 ### Phase 8: Deploy (2 days)
 

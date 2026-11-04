@@ -15,7 +15,7 @@ const links = [
 export function Footer() {
   return (
     <footer className="mt-16 bg-ink text-paper">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-2">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-2 [&>div]:min-w-0">
         <div>
           <Logo light />
           <p className="mt-4 max-w-md text-sm text-paper/75">{SITE.description}</p>
