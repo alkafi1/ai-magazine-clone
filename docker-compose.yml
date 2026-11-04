@@ -2,6 +2,7 @@
 services:
   mongo:
     image: mongo:7
+    user: mongodb # skip the entrypoint's gosu step, which hangs on some hosts
     restart: unless-stopped
     ports: ['27017:27017']
     volumes: [mongo-data:/data/db]

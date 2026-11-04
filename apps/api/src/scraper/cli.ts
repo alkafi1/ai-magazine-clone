@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
-import { scrapeOnce } from './run.js';
+import { scrapeOnce } from './once.js';
 
 const { values } = parseArgs({
   options: { limit: { type: 'string', default: '20' }, json: { type: 'boolean', default: false } },
@@ -30,7 +30,6 @@ logger.info(
   {
     urlsFound: result.urlsFound,
     parsed: result.articles.length,
-    skipped: result.skipped.length,
     failed: result.failed,
     stoppedEarly: result.stoppedEarly,
     seconds: Math.round((Date.now() - started) / 1000),

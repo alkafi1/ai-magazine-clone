@@ -15,6 +15,7 @@ const envSchema = z.object({
   SCRAPER_CONTACT_EMAIL: z.string().email().default('you@example.com'),
   SCRAPER_DELAY_MS: z.coerce.number().min(1500).max(2000).default(1750),
   SCRAPER_MAX_RETRIES: z.coerce.number().min(0).max(6).default(3),
+  SCRAPER_SECTIONS: z.string().default('news,articles'),
   IMAGE_MODE: z.enum(['hotlink', 'placeholder']).default('hotlink'),
 });
 
@@ -39,6 +40,9 @@ export const config = {
     contactEmail: env.SCRAPER_CONTACT_EMAIL,
     delayMs: env.SCRAPER_DELAY_MS,
     maxRetries: env.SCRAPER_MAX_RETRIES,
+    sections: env.SCRAPER_SECTIONS.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     userAgent: `AIMagBot/1.0 (+${env.WEB_URL}/about; contact: ${env.SCRAPER_CONTACT_EMAIL})`,
   },
   imageMode: env.IMAGE_MODE,

@@ -7,13 +7,17 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "scrape:once": "tsx src/scraper/cli.ts"
+    "scrape:once": "tsx src/scraper/cli.ts",
+    "scrape": "tsx src/scraper/run-cli.ts",
+    "backfill": "tsx src/scraper/run-cli.ts --since",
+    "seed": "tsx src/db/seed-cli.ts"
   },
   "dependencies": {
     "@aimag/shared": "workspace:*",
     "axios": "^1.7.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",
+    "mongoose": "^9.11.4",
     "pino": "^9.0.0",
     "zod": "^3.23.0"
   },

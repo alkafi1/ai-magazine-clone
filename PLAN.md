@@ -343,10 +343,10 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 2: Database and persistence (1-2 days)
 
-- [ ] Mongoose models, indexes, seed (categories)
-- [ ] Upsert with dedup and `sourceHash`
-- [ ] ScrapeRun and ScrapeError logging
-- [ ] Backfill command (`--since 2026-01`)
+- [x] Mongoose models, indexes, seed (categories)
+- [x] Upsert with dedup and `sourceHash`
+- [x] ScrapeRun and ScrapeError logging
+- [x] Backfill command (`--since 2026-01`)
 
 ### Phase 3: Scheduler (1 day)
 

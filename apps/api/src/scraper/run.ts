@@ -1,6 +1,7 @@
-import { logger } from '../lib/logger.js';
+import type { ScrapedArticle } from '@aimag/shared';
 import { config } from '../config/index.js';
-import { BlockedError, DisallowedError, PoliteFetcher } from './fetcher.js';
+import { logger } from '../lib/logger.js';
+import { PoliteFetcher } from './fetcher.js';
 import { normalizeArticle } from './normalizer.js';
 import { parseArticleHtml } from './parser.js';
 import {
@@ -9,64 +10,63 @@ import {
   pickArticleSitemaps,
   type SitemapUrl,
 } from './sitemap.js';
-import type { ScrapedArticle } from '@aimag/shared';
 
-export type ScrapeResult = {
-  urlsFound: number;
-  articles: ScrapedArticle[];
-  skipped: { url: string; reason: string }[];
-  failed: { url: string; stage: string; message: string; httpStatus?: number }[];
-  stoppedEarly: string | null;
-};
+/** Stage names match ScrapeError.stage. */
+export class StageError extends Error {
+  constructor(
+    readonly stage: 'parse' | 'normalize',
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
-/** Discover URLs from the newest monthly sitemaps, then fetch and parse up to `limit` pages. */
-export async function scrapeOnce(opts: { limit: number; months?: number }): Promise<ScrapeResult> {
+export async function createFetcher(): Promise<PoliteFetcher> {
   const fetcher = new PoliteFetcher();
-  const result: ScrapeResult = {
-    urlsFound: 0,
-    articles: [],
-    skipped: [],
-    failed: [],
-    stoppedEarly: null,
-  };
-
   await fetcher.loadRobots();
+  return fetcher;
+}
+
+/** True if the URL's first path segment is one of the configured article sections. */
+export function inConfiguredSection(url: string): boolean {
+  const first = new URL(url).pathname.split('/').filter(Boolean)[0];
+  return !!first && config.scraper.sections.includes(first);
+}
+
+/**
+ * List article entries from monthly sitemaps.
+ * `months`: newest N sitemaps. `since` ('YYYY-MM'): every monthly sitemap from that month on.
+ */
+export async function discoverEntries(
+  fetcher: PoliteFetcher,
+  opts: { months?: number; since?: string },
+): Promise<SitemapUrl[]> {
   const index = parseSitemapIndex(await fetcher.get(`${config.scraper.baseUrl}/sitemap.xml`));
-  const monthly = pickArticleSitemaps(index, opts.months ?? 2);
+  let monthly = pickArticleSitemaps(index, opts.since ? 1000 : (opts.months ?? 2));
+  if (opts.since) {
+    const [y, m] = opts.since.split('-').map(Number) as [number, number];
+    monthly = monthly.filter((u) => {
+      const match = u.match(/sitemap-articles-(\d{1,2})-(\d{4})\.xml$/)!;
+      return Number(match[2]) * 100 + Number(match[1]) >= y * 100 + m;
+    });
+    monthly.reverse(); // oldest first for backfill
+  }
   logger.info({ monthly }, 'article sitemaps selected');
 
   const entries: SitemapUrl[] = [];
   for (const url of monthly) entries.push(...parseArticleSitemap(await fetcher.get(url)));
-  result.urlsFound = entries.length;
+  return entries.filter((e) => inConfiguredSection(e.loc) && fetcher.isAllowed(e.loc));
+}
 
-  for (const entry of entries) {
-    if (result.articles.length >= opts.limit) break;
-    if (!fetcher.isAllowed(entry.loc)) {
-      result.skipped.push({ url: entry.loc, reason: 'robots' });
-      continue;
-    }
-    try {
-      const html = await fetcher.get(entry.loc);
-      const raw = parseArticleHtml(html);
-      const article = raw && normalizeArticle(raw, entry.loc, entry);
-      if (!article) {
-        result.failed.push({ url: entry.loc, stage: 'parse', message: 'missing title or date' });
-        continue;
-      }
-      result.articles.push(article);
-      logger.info({ url: entry.loc, via: raw.source }, 'article parsed');
-    } catch (err) {
-      if (err instanceof DisallowedError) {
-        result.skipped.push({ url: entry.loc, reason: 'robots' });
-        continue;
-      }
-      const message = err instanceof Error ? err.message : String(err);
-      result.failed.push({ url: entry.loc, stage: 'fetch', message });
-      if (err instanceof BlockedError) {
-        result.stoppedEarly = message;
-        break;
-      }
-    }
-  }
-  return result;
+/** Fetch one article page and return its normalized shape. Throws StageError on bad data. */
+export async function fetchArticle(
+  fetcher: PoliteFetcher,
+  entry: SitemapUrl,
+): Promise<{ article: ScrapedArticle; via: string }> {
+  const html = await fetcher.get(entry.loc);
+  const raw = parseArticleHtml(html);
+  if (!raw) throw new StageError('parse', 'no usable title/date in any layer');
+  const article = normalizeArticle(raw, entry.loc, entry);
+  if (!article) throw new StageError('normalize', 'normalized article failed validation');
+  return { article, via: raw.source };
 }

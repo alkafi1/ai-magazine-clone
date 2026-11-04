@@ -42,6 +42,17 @@ pnpm --filter @aimag/shared build
 
 See [.env.example](.env.example); all are validated with zod in `apps/api/src/config`.
 
+## Data model notes
+
+- Upsert key is `sourceUrl`; an article is only rewritten when `sourceHash` changes. Admin-controlled fields
+  (`isFeatured`, `isHidden`, `seo`, `slug`) are never overwritten by the scraper.
+- Only the sections in `SCRAPER_SECTIONS` (default `news,articles`) are imported; the source sitemap also
+  lists `/events/` and `/press-releases/` pages, which are excluded.
+- Source pages expose no modified date, and the sitemap has no `lastmod`, so a known URL is not re-fetched.
+- Tests in `src/db` need MongoDB (`docker compose up -d mongo`); they use the `aimag_test` database
+  (override with `MONGODB_URI_TEST`).
+- The compose mongo service runs as the `mongodb` user: the default entrypoint's `gosu` step hung on this host.
+
 ## Defaults chosen
 
 - Package manager pnpm; tests with Vitest; logging with pino; validation with zod.
