@@ -3,7 +3,6 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { isValidObjectId } from 'mongoose';
 import { z } from 'zod';
-import { logger } from '../../lib/logger.js';
 import {
   AdminUser,
   Article,
