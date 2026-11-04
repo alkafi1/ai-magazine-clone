@@ -13,7 +13,8 @@ vi.mock('./alert.js', () => ({ sendAlert }));
 
 const { connectDb, disconnectDb } = await import('../db/connection.js');
 const { acquireLock, releaseLock } = await import('./lock.js');
-const { executeRun } = await import('./runner.js');
+const { executeRun, recoverStaleRuns, LOCK_TTL_MS } = await import('./runner.js');
+const { ScrapeRun, ScrapeError } = await import('../models/index.js');
 const { revalidateWeb } = await import('./revalidate.js');
 const { config } = await import('../config/index.js');
 
@@ -94,6 +95,21 @@ describe('executeRun', () => {
     const res = await executeRun({ trigger: 'cron' });
     expect(res).toMatchObject({ attempts: 2 });
     expect(sendAlert).not.toHaveBeenCalled();
+  });
+});
+
+describe('recoverStaleRuns', () => {
+  it('fails runs left running past the lock lifetime and leaves recent ones alone', async () => {
+    const old = await ScrapeRun.create({
+      trigger: 'cron',
+      status: 'running',
+      startedAt: new Date(Date.now() - LOCK_TTL_MS - 60_000),
+    });
+    const fresh = await ScrapeRun.create({ trigger: 'manual', status: 'running' });
+    expect(await recoverStaleRuns()).toBe(1);
+    expect((await ScrapeRun.findById(old._id))?.status).toBe('failed');
+    expect((await ScrapeRun.findById(fresh._id))?.status).toBe('running');
+    expect(await ScrapeError.countDocuments({ run: old._id })).toBe(1);
   });
 });
 

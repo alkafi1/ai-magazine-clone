@@ -4,9 +4,11 @@ import { seedCategories } from './db/seed.js';
 import { createApp } from './http/app.js';
 import { logger } from './lib/logger.js';
 import { startScheduler, stopScheduler } from './scheduler/index.js';
+import { recoverStaleRuns } from './scheduler/runner.js';
 
 await connectDb();
 await seedCategories();
+await recoverStaleRuns();
 const server = createApp().listen(config.port, () =>
   logger.info({ port: config.port }, 'api listening'),
 );

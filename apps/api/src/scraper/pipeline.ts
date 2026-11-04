@@ -110,8 +110,10 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
         }
       }
     }
-    if (s.status === 'success' && (s.failed > 0 || s.aborted))
-      s.status = s.created + s.updated > 0 ? 'partial' : 'failed';
+    if (s.status === 'success' && (s.failed > 0 || s.aborted)) {
+      // A deliberate stop (shutdown) is partial, not a failure.
+      s.status = s.aborted || s.created + s.updated > 0 ? 'partial' : 'failed';
+    }
   } catch (err) {
     s.status = err instanceof BlockedError ? 'blocked' : 'failed';
     await logError({

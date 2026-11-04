@@ -14,7 +14,7 @@ import {
   ScrapeRun,
 } from '../../models/index.js';
 import { revalidateWeb } from '../../scheduler/revalidate.js';
-import { executeRun } from '../../scheduler/runner.js';
+import { startRun } from '../../scheduler/index.js';
 import { adminOf, requireAdmin, signAdminToken } from '../middleware/auth.js';
 import { clearCache } from '../middleware/cache.js';
 import { HttpError, parse } from '../middleware/error.js';
@@ -228,9 +228,7 @@ export function adminRouter(opts: { loginMax: number }) {
 
   r.post('/scrape-runs', async (req, res) => {
     await audit(req, 'scrape.manual');
-    void executeRun({ trigger: 'manual' })
-      .then(() => clearCache())
-      .catch((err) => logger.error({ err }, 'manual run crashed'));
+    startRun('manual');
     res.status(202).json({ accepted: true });
   });
 

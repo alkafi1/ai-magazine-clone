@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const executeRun = vi.fn().mockResolvedValue({ started: true });
-vi.mock('../scheduler/runner.js', () => ({ executeRun }));
+const startRun = vi.fn();
+vi.mock('../scheduler/index.js', () => ({ startRun }));
 const revalidateWeb = vi.fn().mockResolvedValue(true);
 vi.mock('../scheduler/revalidate.js', () => ({ revalidateWeb }));
 
@@ -56,7 +56,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await Promise.all(Object.values(mongoose.models).map((m) => m.deleteMany({})));
   clearCache();
-  executeRun.mockClear();
+  startRun.mockClear();
   revalidateWeb.mockClear();
   await seed();
 });
@@ -313,6 +313,6 @@ describe('admin API', () => {
     const runs = await request(app).get('/api/admin/scrape-runs').set(auth).expect(200);
     expect(runs.body.items[0]).toMatchObject({ trigger: 'cron', created: 3 });
     await request(app).post('/api/admin/scrape-runs').set(auth).expect(202);
-    expect(executeRun).toHaveBeenCalledWith({ trigger: 'manual' });
+    expect(startRun).toHaveBeenCalledWith('manual');
   });
 });

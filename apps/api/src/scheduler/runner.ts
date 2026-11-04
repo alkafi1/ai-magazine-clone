@@ -1,6 +1,7 @@
 import { config } from '../config/index.js';
 import { clearCache } from '../http/middleware/cache.js';
 import { logger } from '../lib/logger.js';
+import { ScrapeError, ScrapeRun } from '../models/index.js';
 import { runScrape, type RunOptions, type RunSummary } from '../scraper/pipeline.js';
 import { sendAlert } from './alert.js';
 import { acquireLock, releaseLock } from './lock.js';
@@ -8,7 +9,7 @@ import { revalidateWeb } from './revalidate.js';
 
 const LOCK_NAME = 'scrape';
 /** Lock expires on its own if a process dies mid-run. */
-const LOCK_TTL_MS = 60 * 60 * 1000;
+export const LOCK_TTL_MS = 30 * 60 * 1000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type ExecuteResult =
@@ -59,4 +60,26 @@ export async function executeRun(
   } finally {
     await releaseLock(LOCK_NAME, owner);
   }
+}
+
+/**
+ * Call once at startup. A run still marked `running` after the lock lifetime belongs to a process
+ * that died (crash, OOM, hard kill), so close it out instead of leaving it stuck forever.
+ */
+export async function recoverStaleRuns(): Promise<number> {
+  const cutoff = new Date(Date.now() - LOCK_TTL_MS);
+  const stale = await ScrapeRun.find(
+    { status: 'running', startedAt: { $lt: cutoff } },
+    '_id',
+  ).lean();
+  for (const run of stale) {
+    await ScrapeRun.updateOne({ _id: run._id }, { status: 'failed', finishedAt: new Date() });
+    await ScrapeError.create({
+      run: run._id,
+      stage: 'discover',
+      message: 'run interrupted (process stopped before it finished)',
+    });
+  }
+  if (stale.length) logger.warn({ count: stale.length }, 'closed out stale scrape runs');
+  return stale.length;
 }

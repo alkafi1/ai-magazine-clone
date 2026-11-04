@@ -112,7 +112,8 @@ Cross-cutting: zod validation on every input, helmet, CORS allowlist (`CORS_ORIG
 - On failure or block an alert is logged and POSTed to `ALERT_WEBHOOK_URL` (Slack/Discord-style `text` field).
 - After a run that changed anything, the API calls `POST {WEB_URL}/api/revalidate` with header
   `x-revalidate-secret` (tags: `home`, `category:<slug>`, `article:<slug>`). Failures are only logged.
-- SIGINT/SIGTERM stops the cron, lets the current page finish, marks the run partial and exits.
+- SIGINT/SIGTERM stops the cron, lets any running scrape (cron or admin button) finish its current page, records it as `partial`, releases the lock and exits.
+- On startup, runs still marked `running` past the 30-minute lock lifetime (a crashed process) are closed out as `failed`.
 - Manual run: `POST /api/admin/scrape-runs` with an admin JWT (returns 202), or the admin panel button (Phase 6).
 - The web app defaults to port 3100 because 3000 is commonly taken.
 
