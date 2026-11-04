@@ -41,7 +41,7 @@ export function ArticleEditor({
   canFeature: boolean;
 }) {
   return (
-    <form action={saveArticle} encType="multipart/form-data" className="grid gap-6 lg:grid-cols-3">
+    <form action={saveArticle} className="grid gap-6 lg:grid-cols-3">
       {article && <input type="hidden" name="target" value={article.id} />}
       <div className="space-y-5 lg:col-span-2">
         <Card>

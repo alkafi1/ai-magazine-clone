@@ -74,7 +74,7 @@ export default async function AppearanceAdmin({
         description="Your logo and name, the look of the whole public site, and its menus. Saved changes go live within a minute, without a redeploy."
       />
       <Flash ok={sp.ok} err={sp.err} />
-      <form action={saveAppearance} encType="multipart/form-data" className="space-y-6">
+      <form action={saveAppearance} className="space-y-6">
         <Card
           title="Theme"
           description="Switch the whole public site between designs. Visitors can still toggle dark mode."
