@@ -357,9 +357,9 @@ Design: own brand name and logo, own palette, own fonts, accessible contrast, re
 
 ### Phase 4: Backend API (3-4 days)
 
-- [ ] All public endpoints, search, related, trending
-- [ ] Caching, rate limit, validation, error handling
-- [ ] API tests (Supertest)
+- [x] All public endpoints, search, related, trending
+- [x] Caching, rate limit, validation, error handling
+- [x] API tests (Supertest)
 
 ### Phase 5: Frontend MVP, SEO-first (7-9 days)
 

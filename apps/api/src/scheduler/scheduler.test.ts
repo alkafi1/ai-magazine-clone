@@ -1,7 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import mongoose from 'mongoose';
-import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 process.env.SCHEDULER_RETRY_DELAY_MS = '1';
@@ -16,7 +15,6 @@ const { connectDb, disconnectDb } = await import('../db/connection.js');
 const { acquireLock, releaseLock } = await import('./lock.js');
 const { executeRun } = await import('./runner.js');
 const { revalidateWeb } = await import('./revalidate.js');
-const { createApp } = await import('../http/app.js');
 const { config } = await import('../config/index.js');
 
 const summary = (over: Record<string, unknown> = {}) => ({
@@ -123,22 +121,5 @@ describe('revalidateWeb', () => {
 
     (config as { webUrl: string }).webUrl = 'http://127.0.0.1:1';
     expect(await revalidateWeb({ articleSlugs: [], categorySlugs: [] })).toBe(false);
-  });
-});
-
-describe('manual trigger endpoint', () => {
-  it('requires the secret, then accepts', async () => {
-    runScrape.mockResolvedValue(summary());
-    const app = createApp();
-    await request(app).post('/api/internal/scrape-runs').expect(401);
-    await request(app)
-      .post('/api/internal/scrape-runs')
-      .set('x-internal-secret', 'wrong')
-      .expect(401);
-    await request(app)
-      .post('/api/internal/scrape-runs')
-      .set('x-internal-secret', config.revalidateSecret)
-      .expect(202);
-    await request(app).get('/health').expect(200);
   });
 });

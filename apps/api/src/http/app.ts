@@ -1,44 +1,46 @@
-import { timingSafeEqual } from 'node:crypto';
-import express, { type NextFunction, type Request, type Response } from 'express';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { config } from '../config/index.js';
-import { logger } from '../lib/logger.js';
-import { executeRun } from '../scheduler/runner.js';
+import { errorHandler, notFound } from './middleware/error.js';
+import { adminRouter } from './routes/admin.js';
+import { publicRouter } from './routes/public.js';
 
-function secretsMatch(a: string, b: string): boolean {
-  const ba = Buffer.from(a);
-  const bb = Buffer.from(b);
-  return ba.length === bb.length && timingSafeEqual(ba, bb);
-}
+export type AppOptions = { loginMax?: number; newsletterMax?: number; globalMax?: number };
 
-/** Temporary guard for internal endpoints; Phase 4 adds JWT admin auth on top. */
-function requireInternalSecret(req: Request, res: Response, next: NextFunction) {
-  const given = req.header('x-internal-secret') ?? '';
-  if (!secretsMatch(given, config.revalidateSecret)) {
-    res.status(401).json({ error: 'unauthorized' });
-    return;
-  }
-  next();
-}
-
-export function createApp() {
+export function createApp(opts: AppOptions = {}) {
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '100kb' }));
+  // Behind Nginx in production: trust the first proxy so rate limits see the real client IP.
+  if (config.env === 'production') app.set('trust proxy', 1);
+
+  app.use(helmet());
+  app.use(
+    cors({
+      origin(origin, cb) {
+        // No Origin header = server-to-server or curl; browsers must be on the allowlist.
+        cb(null, !origin || config.corsOrigins.includes(origin));
+      },
+      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    }),
+  );
+  app.use(express.json({ limit: '50kb' }));
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 60_000,
+      limit: opts.globalMax ?? 300,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+    }),
+  );
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
+  app.use('/api/admin', adminRouter({ loginMax: opts.loginMax ?? 10 }));
+  app.use('/api', publicRouter({ newsletterMax: opts.newsletterMax ?? 5 }));
 
-  // Manual trigger: starts a run in the background and returns immediately.
-  app.post('/api/internal/scrape-runs', requireInternalSecret, (_req, res) => {
-    void executeRun({ trigger: 'manual' }).catch((err) =>
-      logger.error({ err }, 'manual run crashed'),
-    );
-    res.status(202).json({ accepted: true });
-  });
-
-  app.use((_req, res) => res.status(404).json({ error: 'not found' }));
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    logger.error({ err }, 'unhandled error');
-    res.status(500).json({ error: 'internal error' });
-  });
+  app.use(notFound);
+  app.use(errorHandler);
   return app;
 }

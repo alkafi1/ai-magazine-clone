@@ -42,6 +42,23 @@ pnpm --filter @aimag/shared build
 
 See [.env.example](.env.example); all are validated with zod in `apps/api/src/config`.
 
+## API
+
+`pnpm --filter @aimag/api dev` serves on `API_PORT` (4000). Create the first admin with
+`pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'` (min 12 chars).
+
+Public (cached 60-300s, `Cache-Control` set for CDN/Nginx): `GET /api/articles` (`category`, `tag`, `author`, `page`,
+`limit`, `sort=latest|popular`), `/api/articles/:slug` (404 unknown, **410 taken down**), `/:slug/related`,
+`POST /:slug/view`, `/api/home`, `/api/categories`, `/api/tags`, `/api/authors/:slug`, `/api/search?q=`,
+`/api/trending`, `POST /api/newsletter` (5/hour/IP), `POST /api/revalidate` (header `x-revalidate-secret`).
+
+Admin (`Authorization: Bearer <jwt>`, 12h): `POST /api/admin/login` (10 tries/15 min/IP), `GET|PATCH|DELETE
+/api/admin/articles[/:id]`, `GET|POST /api/admin/scrape-runs`, `GET /api/admin/stats`. `DELETE` is a **takedown**
+(hidden + 410), not a hard delete, so the scraper does not re-import the article. Changes are written to `AuditLog`.
+
+Cross-cutting: zod validation on every input, helmet, CORS allowlist (`CORS_ORIGINS`), global rate limit
+(300/min/IP), central JSON error handler, pino logs. The cache is in-memory per process and cleared on admin edits.
+
 ## Scheduler
 
 `pnpm --filter @aimag/api dev` (or `start` after build) runs the API and the scheduler in one process.
@@ -53,8 +70,7 @@ See [.env.example](.env.example); all are validated with zod in `apps/api/src/co
 - After a run that changed anything, the API calls `POST {WEB_URL}/api/revalidate` with header
   `x-revalidate-secret` (tags: `home`, `category:<slug>`, `article:<slug>`). Failures are only logged.
 - SIGINT/SIGTERM stops the cron, lets the current page finish, marks the run partial and exits.
-- Manual run: `curl -X POST -H "x-internal-secret: $REVALIDATE_SECRET" localhost:4000/api/internal/scrape-runs`
-  (returns 202; Phase 4 adds the JWT-protected admin equivalent).
+- Manual run: `POST /api/admin/scrape-runs` with an admin JWT (returns 202), or the admin panel button (Phase 6).
 - The web app defaults to port 3100 because 3000 is commonly taken.
 
 ## Data model notes
