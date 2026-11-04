@@ -141,8 +141,99 @@ export const defaultSiteSettings = (): SiteSettings => ({
   footerNote: '',
 });
 
+// ---- Appearance: branding, theme, navigation ------------------------------------------------------
+
+export const THEMES = ['synthwire', 'broadsheet', 'midnight'] as const;
+export type Theme = (typeof THEMES)[number];
+export const THEME_INFO: Record<Theme, { name: string; description: string }> = {
+  synthwire: {
+    name: 'Synthwire',
+    description: 'The default: warm paper, violet accent, editorial serif headlines.',
+  },
+  broadsheet: {
+    name: 'Broadsheet',
+    description:
+      'Classic newspaper: cream paper, black ink, red accent, serif everywhere, centred masthead, square corners.',
+  },
+  midnight: {
+    name: 'Midnight',
+    description:
+      'Dark-first tech look: deep navy, electric cyan accent, geometric headlines, glowing cards.',
+  },
+};
+
+const mediaId = z
+  .string()
+  .trim()
+  .regex(/^([a-f0-9]{24})?$/, 'invalid image id');
+const navLink = z.object({
+  label: z.string().trim().min(1).max(40),
+  href: z
+    .string()
+    .trim()
+    .max(300)
+    .refine(
+      (v) => (v.startsWith('/') && !v.startsWith('//')) || /^https:\/\//.test(v),
+      'must be a /path or an https URL',
+    ),
+});
+export type NavLink = z.infer<typeof navLink>;
+
+export const appearanceSettingsSchema = z.object({
+  branding: z.object({
+    name: z.string().trim().min(1).max(40),
+    tagline: z.string().trim().max(120),
+    description: z.string().trim().max(300),
+    /** Uploaded image ids (Media). Empty = use the built-in logo. */
+    logoMediaId: mediaId,
+    logoDarkMediaId: mediaId,
+    faviconMediaId: mediaId,
+    /** Show the site name next to the logo image. */
+    showName: z.boolean(),
+    contactEmail: z
+      .string()
+      .trim()
+      .max(254)
+      .refine((v) => v === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'not a valid email'),
+  }),
+  theme: z.enum(THEMES),
+  navigation: z.object({
+    header: z.object({ mode: z.enum(['auto', 'custom']), items: z.array(navLink).max(12) }),
+    footer: z.array(navLink).max(20),
+  }),
+});
+export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
+
+export const defaultAppearanceSettings = (): AppearanceSettings => ({
+  branding: {
+    name: 'Synthwire',
+    tagline: 'The wire for artificial intelligence news',
+    description:
+      'Synthwire curates the day’s most important AI headlines — models, chips, startups, policy and people — and points you to the original reporting.',
+    logoMediaId: '',
+    logoDarkMediaId: '',
+    faviconMediaId: '',
+    showName: true,
+    contactEmail: '',
+  },
+  theme: 'synthwire',
+  navigation: { header: { mode: 'auto', items: [] }, footer: [] },
+});
+
 /** What the public site is allowed to see (no ids of disabled things, no unused html). */
 export type PublicConfig = {
+  branding: {
+    name: string;
+    tagline: string;
+    description: string;
+    logoUrl: string;
+    logoDarkUrl: string;
+    faviconUrl: string;
+    showName: boolean;
+    contactEmail: string;
+  };
+  theme: Theme;
+  navigation: AppearanceSettings['navigation'];
   announcement: { text: string; href: string; tone: SiteSettings['announcement']['tone'] } | null;
   social: SiteSettings['social'];
   ga4Id: string;
@@ -164,8 +255,12 @@ export type PublicConfig = {
 export function toPublicConfig(
   site: SiteSettings,
   ads: AdsSettings,
-  now = new Date(),
+  appearance: AppearanceSettings = defaultAppearanceSettings(),
+  opts: { mediaBase?: string; now?: Date } = {},
 ): PublicConfig {
+  const now = opts.now ?? new Date();
+  const media = (id: string) => (id && opts.mediaBase ? `${opts.mediaBase}/api/media/${id}` : '');
+  const b = appearance.branding;
   const a = site.announcement;
   const live = a.enabled && a.text !== '' && (a.expiresAt === '' || new Date(a.expiresAt) > now);
   const adsLive =
@@ -181,6 +276,18 @@ export function toPublicConfig(
     }
   }
   return {
+    branding: {
+      name: b.name,
+      tagline: b.tagline,
+      description: b.description,
+      logoUrl: media(b.logoMediaId),
+      logoDarkUrl: media(b.logoDarkMediaId),
+      faviconUrl: media(b.faviconMediaId),
+      showName: b.showName,
+      contactEmail: b.contactEmail,
+    },
+    theme: appearance.theme,
+    navigation: appearance.navigation,
     announcement: live ? { text: a.text, href: a.href, tone: a.tone } : null,
     social: site.social,
     ga4Id: site.analytics.ga4Id,

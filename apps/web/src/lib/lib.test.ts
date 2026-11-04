@@ -4,8 +4,19 @@ import { breadcrumbLd, newsArticleLd, websiteLd } from './jsonld';
 import { esc } from './xml';
 import type { Article } from './types';
 
+const branding = {
+  name: 'Test Site',
+  tagline: 't',
+  description: 'd',
+  logoUrl: '',
+  logoDarkUrl: '',
+  faviconUrl: '',
+  showName: true,
+  contactEmail: '',
+};
 const article: Article = {
   id: '1',
+  kind: 'scraped',
   title: 'A Headline',
   slug: 'a-headline',
   excerpt: 'Short summary.',
@@ -46,12 +57,17 @@ describe('pagination helpers', () => {
 
 describe('structured data', () => {
   it('NewsArticle links back to the original source', () => {
-    const ld = newsArticleLd(article);
+    const ld = newsArticleLd(article, branding);
     expect(ld['@type']).toBe('NewsArticle');
-    expect(ld.isBasedOn.url).toBe(article.sourceUrl);
+    expect(ld.isBasedOn?.url).toBe(article.sourceUrl);
     expect(ld.mainEntityOfPage['@id']).toMatch(/\/article\/a-headline$/);
     expect(ld.image[0]).toMatch(/\/og\/a-headline$/);
     expect(ld.author?.name).toBe('Adam Pond');
+  });
+  it('our own articles are not "based on" anything, and the publisher is our site', () => {
+    const ld = newsArticleLd({ ...article, kind: 'original', sourceUrl: null }, branding);
+    expect(ld).not.toHaveProperty('isBasedOn');
+    expect(ld.publisher.name).toBe('Test Site');
   });
   it('BreadcrumbList positions are 1-based and absolute', () => {
     const ld = breadcrumbLd([
@@ -62,7 +78,7 @@ describe('structured data', () => {
     expect(ld.itemListElement[1]!.item).toMatch(/^https?:\/\/.+\/category\/robotics$/);
   });
   it('WebSite exposes a SearchAction', () => {
-    expect(websiteLd().potentialAction['@type']).toBe('SearchAction');
+    expect(websiteLd(branding).potentialAction['@type']).toBe('SearchAction');
   });
 });
 

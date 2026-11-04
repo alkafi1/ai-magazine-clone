@@ -1,5 +1,5 @@
 import 'server-only';
-import type { Permission, Role } from '@aimag/shared';
+import type { Permission } from '@aimag/shared';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
@@ -79,9 +79,11 @@ export type Me = {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: string;
   permissions: Permission[];
-  assignableRoles: Role[];
+  roleName: string;
+  rank: number;
+  assignableRoles: { key: string; name: string; rank: number }[];
 };
 
 /** The signed-in admin. Memoised per request, so layout and page share one API call. */
@@ -95,3 +97,25 @@ export async function guard(permission: Permission): Promise<Me> {
 }
 
 export const can = (me: Me, permission: Permission) => me.permissions.includes(permission);
+
+/** Upload an image to the media library; returns its id. Throws AdminApiError with a readable message. */
+export async function adminUpload(file: File): Promise<string> {
+  const token = await getToken();
+  if (!token) redirect('/admin/login');
+  if (file.size > 2 * 1024 * 1024) throw new AdminApiError(413, 'That image is larger than 2 MB.');
+  const res = await fetch(`${API}/api/admin/media`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'x-internal-secret': process.env.REVALIDATE_SECRET ?? '',
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-filename': file.name,
+    },
+    body: await file.arrayBuffer(),
+  });
+  if (res.status === 401) redirect('/admin/login?expired=1');
+  const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+  if (!res.ok || !body.id) throw new AdminApiError(res.status, body.error ?? 'Upload failed');
+  return body.id;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 
 /**
  * A button that asks "are you sure?" in a modal before submitting the surrounding <form>.
@@ -22,6 +22,7 @@ export function ConfirmButton({
   danger?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   return (
     <>
       <button type="button" className={className} onClick={() => ref.current?.showModal()}>
@@ -29,11 +30,11 @@ export function ConfirmButton({
       </button>
       <dialog
         ref={ref}
-        aria-labelledby="confirm-title"
+        aria-labelledby={titleId}
         className="m-auto w-full max-w-md rounded-xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-900/50"
       >
         <div className="p-6">
-          <h2 id="confirm-title" className="text-lg font-semibold text-slate-900">
+          <h2 id={titleId} className="text-lg font-semibold text-slate-900">
             {title}
           </h2>
           <p className="mt-2 text-sm text-slate-600">{message}</p>

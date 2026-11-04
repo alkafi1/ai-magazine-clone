@@ -1,4 +1,4 @@
-import { ROLE_LABELS, type Permission } from '@aimag/shared';
+import type { Permission } from '@aimag/shared';
 import Link from 'next/link';
 import { DesktopSidebar, MobileNav, type NavItem } from '@/components/admin/Sidebar';
 import { Badge } from '@/components/admin/ui';
@@ -21,6 +21,15 @@ const NAV: (NavItem & { perm?: Permission })[] = [
     perm: 'articles.view',
   },
   {
+    href: '/admin/categories',
+    label: 'Categories',
+    icon: 'categories',
+    section: 'Content',
+    perm: 'articles.view',
+  },
+  { href: '/admin/pages', label: 'Pages', icon: 'pages', section: 'Content', perm: 'pages.manage' },
+  { href: '/admin/media', label: 'Media', icon: 'media', section: 'Content', perm: 'media.manage' },
+  {
     href: '/admin/scrape-runs',
     label: 'Scrape runs',
     icon: 'runs',
@@ -34,18 +43,32 @@ const NAV: (NavItem & { perm?: Permission })[] = [
     section: 'Content',
     perm: 'subscribers.view',
   },
-  { href: '/admin/ads', label: 'Ads', icon: 'ads', section: 'Monetization', perm: 'ads.manage' },
+  {
+    href: '/admin/appearance',
+    label: 'Appearance',
+    icon: 'appearance',
+    section: 'Site',
+    perm: 'appearance.manage',
+  },
+  { href: '/admin/ads', label: 'Ads', icon: 'ads', section: 'Site', perm: 'ads.manage' },
   {
     href: '/admin/settings',
     label: 'Site settings',
     icon: 'settings',
-    section: 'Configuration',
+    section: 'Site',
     perm: 'settings.manage',
   },
   {
     href: '/admin/users',
-    label: 'Users & roles',
+    label: 'Users',
     icon: 'users',
+    section: 'Administration',
+    perm: 'users.view',
+  },
+  {
+    href: '/admin/roles',
+    label: 'Roles',
+    icon: 'roles',
     section: 'Administration',
     perm: 'users.view',
   },
@@ -79,7 +102,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
               </p>
               <p className="text-xs text-slate-500">{me.name ? me.email : ''}</p>
             </div>
-            <Badge tone="violet">{ROLE_LABELS[me.role]}</Badge>
+            <Badge tone="violet">{me.roleName}</Badge>
             <Link
               href="/admin/account"
               className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:inline"

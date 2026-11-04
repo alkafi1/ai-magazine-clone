@@ -5,37 +5,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { AdminApiError, COOKIE, adminApi, adminLogin } from '@/lib/admin';
-
-const SESSION_HOURS = 12;
-
-async function setSession(token: string) {
-  (await cookies()).set(COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/admin',
-    maxAge: SESSION_HOURS * 3600, // matches the API token lifetime
-  });
-}
-
-/**
- * Run an admin action, then redirect back with ?ok= or ?err=. API errors become messages the user can
- * read; anything unexpected is rethrown. (redirect() throws, so it must be called outside the try.)
- */
-async function act(back: string, ok: string, fn: () => Promise<unknown>): Promise<never> {
-  let error: string | null = null;
-  try {
-    await fn();
-  } catch (e) {
-    if (e instanceof AdminApiError) error = e.message;
-    else throw e;
-  }
-  const url = new URL(back, 'http://x');
-  url.searchParams.delete('ok');
-  url.searchParams.delete('err');
-  url.searchParams.set(error ? 'err' : 'ok', error ?? ok);
-  redirect(url.pathname + url.search);
-}
+import { act, setSession } from '@/lib/act';
 
 // ---- session ---------------------------------------------------------------------------------
 const loginSchema = z.object({
@@ -181,7 +151,9 @@ export async function saveSiteSettings(formData: FormData) {
       text: text(formData, 'ann_text'),
       href: text(formData, 'ann_href'),
       tone: text(formData, 'ann_tone'),
-      expiresAt: expires ? new Date(expires).toISOString() : '',
+      expiresAt: expires
+        ? new Date(/(Z|[+-]\d\d:?\d\d)$/.test(expires) ? expires : `${expires}:00Z`).toISOString()
+        : '',
     },
     social: Object.fromEntries(
       ['x', 'linkedin', 'youtube', 'facebook', 'instagram'].map((k) => [
@@ -239,8 +211,11 @@ export async function createUser(formData: FormData) {
     role: text(formData, 'role'),
     password: String(formData.get('password') ?? ''),
   };
-  await act('/admin/users', `Account created for ${body.email}.`, () =>
-    adminApi('/users', { method: 'POST', body: JSON.stringify(body) }),
+  await act(
+    '/admin/users',
+    `Account created for ${body.email}.`,
+    () => adminApi('/users', { method: 'POST', body: JSON.stringify(body) }),
+    String(formData.get('_open') ?? '') || undefined,
   );
 }
 
@@ -252,18 +227,25 @@ export async function updateUser(formData: FormData) {
   if (formData.has('name')) body.name = text(formData, 'name');
   if (formData.has('active')) body.active = flag.parse(formData.get('active'));
   if (formData.get('unlock') === 'true') body.unlock = true;
-  await act('/admin/users', 'Account updated. Their sessions now use the new settings.', () =>
-    adminApi(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  await act(
+    '/admin/users',
+    'Account updated. Their sessions now use the new settings.',
+    () => adminApi(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    String(formData.get('_open') ?? '') || undefined,
   );
 }
 
 export async function resetUserPassword(formData: FormData) {
   const id = idSchema.parse(formData.get('target'));
-  await act('/admin/users', 'Password reset. The user has been signed out everywhere.', () =>
-    adminApi(`/users/${id}/reset-password`, {
-      method: 'POST',
-      body: JSON.stringify({ password: String(formData.get('password') ?? '') }),
-    }),
+  await act(
+    '/admin/users',
+    'Password reset. The user has been signed out everywhere.',
+    () =>
+      adminApi(`/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ password: String(formData.get('password') ?? '') }),
+      }),
+    String(formData.get('_open') ?? '') || undefined,
   );
 }
 

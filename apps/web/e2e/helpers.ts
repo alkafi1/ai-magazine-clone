@@ -43,3 +43,33 @@ export async function apiToken(
 
 export const navLinks = (page: Page) =>
   page.getByRole('navigation', { name: 'Admin' }).first().getByRole('link');
+
+/** A valid 1x1 PNG, for upload tests. */
+export const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
+export const pngFile = (name = 'logo.png') => ({ name, mimeType: 'image/png', buffer: PNG_1PX });
+
+/** Put appearance settings back to the defaults the other specs assume (theme, name, logo, menus). */
+export async function resetAppearance(request: import('@playwright/test').APIRequestContext) {
+  const token = await apiToken(request, 'admin@e2e.test');
+  const headers = { Authorization: `Bearer ${token}` };
+  const cur = await (await request.get(`${API}/api/admin/settings/appearance`, { headers })).json();
+  await request.put(`${API}/api/admin/settings/appearance`, {
+    headers,
+    data: {
+      ...cur,
+      theme: 'synthwire',
+      branding: {
+        ...cur.branding,
+        name: 'Synthwire',
+        logoMediaId: '',
+        logoDarkMediaId: '',
+        faviconMediaId: '',
+        showName: true,
+      },
+      navigation: { header: { mode: 'auto', items: [] }, footer: [] },
+    },
+  });
+}

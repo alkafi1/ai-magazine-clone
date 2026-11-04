@@ -13,7 +13,7 @@ export function SourceAttribution({ url, author }: { url: string; author?: strin
         href={href ?? SITE.sourceUrl}
         target="_blank"
         rel="noopener nofollow"
-        className="mt-4 inline-block rounded-md bg-wire px-5 py-3 font-bold text-white hover:brightness-110"
+        className="mt-4 inline-block rounded-md bg-wire px-5 py-3 font-bold text-on-wire hover:brightness-110"
       >
         Read the full story at {SITE.sourceName} ↗
       </a>

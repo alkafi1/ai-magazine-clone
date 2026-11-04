@@ -1,24 +1,23 @@
-import type { Metadata } from 'next';
 import { Prose } from '@/components/Prose';
+import { builtinMetadata, builtinPage } from '@/lib/builtin-pages';
 import { SITE } from '@/lib/site';
 
-export const metadata: Metadata = {
-  title: 'Terms of use',
-  description: `Terms of use for ${SITE.name}.`,
-  alternates: { canonical: '/terms' },
-};
+export const revalidate = 300;
+export const generateMetadata = () =>
+  builtinMetadata('terms', 'Terms of use', (b) => `Terms of use for ${b.name}.`);
 
 export default function Terms() {
-  return (
+  return builtinPage('terms', (b) => (
     <Prose title="Terms of use" updated="4 November 2026">
-      <p>By using {SITE.name} you agree to these terms.</p>
+      <p>By using {b.name} you agree to these terms.</p>
       <h2>Content</h2>
       <p>
-        Headlines, summaries and images shown here come from third-party publishers, mainly{' '}
+        Aggregated headlines, summaries and images come from third-party publishers, mainly{' '}
         <a href={SITE.sourceUrl} rel="noopener nofollow">
           {SITE.sourceName}
         </a>
-        , and belong to them. {SITE.name} provides links and short summaries for discovery only.
+        , and belong to them. {b.name} provides links and short summaries for discovery only.
+        Articles marked as ours are © {b.name}.
       </p>
       <h2>Acceptable use</h2>
       <p>
@@ -33,5 +32,5 @@ export default function Terms() {
       <h2>Changes</h2>
       <p>We may update these terms; continued use means you accept the new version.</p>
     </Prose>
-  );
+  ));
 }

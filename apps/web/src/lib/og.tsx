@@ -1,10 +1,9 @@
 import { ImageResponse } from 'next/og';
-import { SITE } from './site';
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
 /** Branded 1200x630 card. We generate our own image and never re-share the source's picture. */
-export function ogCard(title: string, kicker: string) {
+export function ogCard(title: string, kicker: string, brand: { name: string; tagline: string }) {
   return new ImageResponse(
     <div
       style={{
@@ -30,7 +29,7 @@ export function ogCard(title: string, kicker: string) {
         <div
           style={{ width: 18, height: 18, borderRadius: 9, background: '#ffb703', marginRight: 16 }}
         />
-        {SITE.name.toUpperCase()}
+        {brand.name.toUpperCase()}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div
@@ -48,7 +47,7 @@ export function ogCard(title: string, kicker: string) {
           {title}
         </div>
       </div>
-      <div style={{ fontSize: 26, color: '#9aa3b8' }}>{SITE.tagline}</div>
+      <div style={{ fontSize: 26, color: '#9aa3b8' }}>{brand.tagline}</div>
     </div>,
     OG_SIZE,
   );

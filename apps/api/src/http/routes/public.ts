@@ -19,7 +19,9 @@ import { HttpError, parse } from '../middleware/error.js';
 import { readSettings } from '../../db/settings.js';
 import {
   adsSettingsSchema,
+  appearanceSettingsSchema,
   defaultAdsSettings,
+  defaultAppearanceSettings,
   defaultSiteSettings,
   siteSettingsSchema,
   toPublicConfig,
@@ -244,11 +246,12 @@ export function publicRouter(opts: { newsletterMax: number }) {
 
   // Everything the public site needs from admin settings (announcement, ads, analytics, social, flags).
   r.get('/site-config', cached(60), async (_req, res) => {
-    const [site, ads] = await Promise.all([
+    const [site, ads, appearance] = await Promise.all([
       readSettings('site', siteSettingsSchema, defaultSiteSettings),
       readSettings('ads', adsSettingsSchema, defaultAdsSettings),
+      readSettings('appearance', appearanceSettingsSchema, defaultAppearanceSettings),
     ]);
-    res.json(toPublicConfig(site, ads));
+    res.json(toPublicConfig(site, ads, appearance, { mediaBase: config.publicApiUrl }));
   });
 
   r.get('/tags/:slug', cached(300), async (req, res) => {

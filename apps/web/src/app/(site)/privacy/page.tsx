@@ -1,15 +1,12 @@
-import type { Metadata } from 'next';
 import { Prose } from '@/components/Prose';
-import { SITE } from '@/lib/site';
+import { builtinMetadata, builtinPage } from '@/lib/builtin-pages';
 
-export const metadata: Metadata = {
-  title: 'Privacy policy',
-  description: `How ${SITE.name} handles personal data.`,
-  alternates: { canonical: '/privacy' },
-};
+export const revalidate = 300;
+export const generateMetadata = () =>
+  builtinMetadata('privacy', 'Privacy policy', (b) => `How ${b.name} handles personal data.`);
 
 export default function Privacy() {
-  return (
+  return builtinPage('privacy', (b) => (
     <Prose title="Privacy policy" updated="4 November 2026">
       <p>We collect as little personal data as possible.</p>
       <h2>What we collect</h2>
@@ -27,19 +24,24 @@ export default function Privacy() {
           <strong>Page views:</strong> we count views of each story to show trending headlines. This
           count is not linked to you.
         </li>
+        <li>
+          <strong>Cookies for advertising and analytics:</strong> if the site shows ads or uses
+          analytics, they load only after you accept the cookie notice. You can change your choice
+          at any time with “Cookie settings” in the footer.
+        </li>
       </ul>
       <h2>What we don’t do</h2>
-      <p>We do not use advertising or tracking cookies, and we do not sell personal data.</p>
+      <p>We do not sell personal data.</p>
       <h2>Third-party links and images</h2>
       <p>
-        Story images are loaded directly from the original publisher, and links lead to their site,
-        which has its own privacy policy.
+        Story images may be loaded directly from the original publisher, and links lead to their
+        site, which has its own privacy policy.
       </p>
       <h2>Your rights</h2>
       <p>
         You may request access to, correction or deletion of your data by emailing{' '}
-        <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a>.
+        <a href={`mailto:${b.contactEmail}`}>{b.contactEmail}</a>.
       </p>
     </Prose>
-  );
+  ));
 }

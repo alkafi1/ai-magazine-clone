@@ -2,6 +2,9 @@ export type Ref = { name: string; slug: string };
 
 export type Article = {
   id: string;
+  kind: 'scraped' | 'original';
+  /** Markdown. Only present for our own (original) articles, and only on the single-article endpoint. */
+  body?: string;
   title: string;
   slug: string;
   excerpt: string;
@@ -11,7 +14,8 @@ export type Article = {
   category: Ref | null;
   author: Ref | null;
   tags: Ref[];
-  sourceUrl: string;
+  /** null for our own articles */
+  sourceUrl: string | null;
   publishedAt: string;
   isFeatured: boolean;
   seo: {

@@ -53,4 +53,4 @@ export function ThemeToggle() {
 }
 
 /** Inline, blocking script: apply the saved (or system) theme before the page paints. */
-export const THEME_INIT = `try{var t=localStorage.getItem('sw_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`;
+export const THEME_INIT = `try{var d=document.documentElement,t=localStorage.getItem('sw_theme');if(t==='dark'||(!t&&(d.dataset.theme==='midnight'||matchMedia('(prefers-color-scheme: dark)').matches)))d.classList.add('dark')}catch(e){}`;

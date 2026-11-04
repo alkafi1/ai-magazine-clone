@@ -2,21 +2,28 @@ import type { Metadata } from 'next';
 import { ArticleCard } from '@/components/ArticleCard';
 import { Trending } from '@/components/Trending';
 import { Ad, inFeedEvery } from '@/components/ads/Ad';
-import { getHome } from '@/lib/api';
-import { SITE } from '@/lib/site';
+import { getBranding, getHome } from '@/lib/api';
 import Link from 'next/link';
 
 export const revalidate = 120;
 
-export const metadata: Metadata = {
-  title: { absolute: `${SITE.name} — ${SITE.tagline}` },
-  description: SITE.description,
-  alternates: { canonical: '/' },
-  openGraph: { title: `${SITE.name} — ${SITE.tagline}`, description: SITE.description, url: '/' },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const b = await getBranding();
+  const title = `${b.name} — ${b.tagline}`;
+  return {
+    title: { absolute: title },
+    description: b.description,
+    alternates: { canonical: '/' },
+    openGraph: { title, description: b.description, url: '/' },
+  };
+}
 
 export default async function HomePage() {
-  const [data, every] = await Promise.all([getHome().catch(() => null), inFeedEvery()]);
+  const [data, every, branding] = await Promise.all([
+    getHome().catch(() => null),
+    inFeedEvery(),
+    getBranding(),
+  ]);
 
   if (!data || !data.hero) {
     return (
@@ -31,7 +38,7 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="sr-only">{SITE.name}: latest artificial intelligence news</h1>
+      <h1 className="sr-only">{branding.name}: latest news</h1>
 
       <section aria-label="Top stories" className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">

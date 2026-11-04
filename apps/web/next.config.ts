@@ -13,7 +13,10 @@ const config: NextConfig = {
   output: 'standalone',
   // Docker's legacy builder forbids signalling child processes (kill EACCES at the end of the build),
   // so the Dockerfile sets NEXT_BUILD_THREADS=1 to use worker threads instead.
-  experimental: { workerThreads: process.env.NEXT_BUILD_THREADS === '1' },
+  experimental: {
+    workerThreads: process.env.NEXT_BUILD_THREADS === '1',
+    serverActions: { bodySizeLimit: '3mb' }, // image uploads (the API caps them at 2 MB)
+  },
   outputFileTracingRoot: resolve(process.cwd(), '../../'),
   // The Content-Security-Policy is set per request in src/proxy.ts (it depends on the admin ad settings).
   // The e2e suite builds into its own dir so it never clobbers a running dev/prod build.

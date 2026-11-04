@@ -17,8 +17,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     <>
       {/* Sets the saved theme before first paint, so there is no light-to-dark flash. */}
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
-      <JsonLd data={organizationLd()} />
-      <JsonLd data={websiteLd()} />
+      <JsonLd data={organizationLd(cfg.branding)} />
+      <JsonLd data={websiteLd(cfg.branding)} />
       <AnnouncementBar a={cfg.announcement} />
       <Header />
       <Ad slot="headerBanner" className="mx-auto max-w-7xl px-4 pt-4" />

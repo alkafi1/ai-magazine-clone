@@ -120,6 +120,33 @@ role or disable/delete yourself; a super admin always exists. Role, disable and 
 Sign-in stores the JWT in an `httpOnly`, `SameSite=Strict` cookie scoped to `/admin` (12 h). Behind a reverse proxy, make it
 set `X-Forwarded-For` to the real client IP so rate limits are per visitor.
 
+### Write your own content, brand it, theme it
+
+Everything below is done in the admin, with no redeploy, and respects RBAC (each area has its own permission).
+
+- **Your own articles** (Articles → _New article_): title, summary, **markdown body** with a toolbar and live preview, category,
+  tags, byline, cover image (upload, library or URL), SEO overrides, and **draft / published / scheduled** (a
+  once-a-minute job publishes scheduled posts on time). Original articles are marked as ours: full text on our own page,
+  **no source box**, `NewsArticle` JSON-LD without `isBasedOn`, searchable by body text. Aggregated stories keep their
+  hard rule: **only headline + short excerpt + image link, never a body** (enforced in the API serializer and tested,
+  even if a body were somehow in the database).
+- **Categories** (create, rename, reorder, hide from the menu, SEO; deleting one that holds stories is refused).
+- **Pages** (About us, a team page…): markdown, published/draft, at `/p/<slug>`. A page with slug `about`, `contact`,
+  `privacy`, `terms` or `dmca` **replaces** that built-in page.
+- **Media library**: PNG/JPEG/WebP/SVG up to 2 MB, content-sniffed (a fake image or an SVG with scripts is refused),
+  stored in MongoDB (so backups include it) and served immutably from `/api/media/<id>` with a sandboxing CSP.
+- **Appearance**: site **name, tagline, logo** (plus a dark-background logo and favicon), **header and footer menus**
+  (automatic, or your own links), and the **theme**.
+- **Themes** (switch the whole public site; visitors can still toggle dark mode): **Synthwire** (default, editorial violet),
+  **Broadsheet** (newspaper: cream paper, black ink, red accent, serif type, centred masthead with a double rule, square corners)
+  and **Midnight** (dark-first tech look: navy, electric cyan, geometric headlines, glowing cards). Every theme passes the
+  automated WCAG 2 A/AA checks in light and dark. Themes are CSS-variable sets in `apps/web/src/app/globals.css`
+  (`html[data-theme=…]`); add a fourth by copying a block and adding its name to `THEMES` in `packages/shared/src/settings.ts`.
+- **Custom roles** (Roles → _New role_): choose a name, a **rank** and any permissions. You can only grant permissions you hold
+  yourself and ranks below your own, and can only manage accounts ranked below you, so a custom role can never be used to escalate.
+  Role edits take effect on the next request; a role in use cannot be deleted. Create/edit forms open in **modals** and
+  re-open with the error beside your input if the save fails.
+
 ### Ads, consent and analytics
 
 Admin → **Ads**: turn ads on, choose **Google AdSense** (publisher ID `ca-pub-…` + ad-unit slot IDs) or **other network**

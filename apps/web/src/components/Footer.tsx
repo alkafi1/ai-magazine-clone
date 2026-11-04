@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { getSiteConfig } from '@/lib/api';
 import { SITE } from '@/lib/site';
+import { NavLink } from './NavLink';
 import { CookieSettingsButton } from './ConsentBanner';
 import { Logo } from './Logo';
 import { NewsletterForm } from './NewsletterForm';
@@ -25,6 +25,11 @@ const socialNames = {
 
 export async function Footer() {
   const cfg = await getSiteConfig();
+  const b = cfg.branding;
+  const footerLinks =
+    cfg.navigation.footer.length > 0
+      ? cfg.navigation.footer
+      : links.map(([href, label]) => ({ href, label }));
   const social = (Object.keys(socialNames) as (keyof typeof socialNames)[]).filter(
     (k) => cfg.social[k],
   );
@@ -33,9 +38,9 @@ export async function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 md:grid-cols-2 [&>div]:min-w-0">
         <div>
           <Logo light />
-          <p className="mt-4 max-w-md text-sm text-snow/75">{SITE.description}</p>
+          <p className="mt-4 max-w-md text-sm text-snow/75">{b.description}</p>
           <p className="mt-4 max-w-md rounded border border-snow/20 p-3 text-sm text-snow/80">
-            Headlines and short summaries on {SITE.name} are aggregated from{' '}
+            Headlines and short summaries on {b.name} are aggregated from{' '}
             <a
               href={SITE.sourceUrl}
               rel="noopener nofollow"
@@ -78,16 +83,20 @@ export async function Footer() {
           aria-label="Footer"
           className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 text-sm"
         >
-          {links.map(([href, label]) => (
-            <Link key={href} href={href} className="text-snow/80 hover:text-signal">
-              {label}
-            </Link>
+          {footerLinks.map((l) => (
+            <NavLink
+              key={l.href + l.label}
+              href={l.href}
+              className="text-snow/80 hover:text-signal"
+            >
+              {l.label}
+            </NavLink>
           ))}
           {(cfg.ads.enabled || cfg.ga4Id) && (
             <CookieSettingsButton className="text-snow/80 hover:text-signal" />
           )}
           <span className="ml-auto text-snow/60">
-            © {new Date().getFullYear()} {SITE.name}
+            © {new Date().getFullYear()} {b.name}
           </span>
         </nav>
       </div>

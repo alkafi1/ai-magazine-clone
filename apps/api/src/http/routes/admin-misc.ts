@@ -1,13 +1,15 @@
 import {
   adsSettingsSchema,
+  appearanceSettingsSchema,
   defaultAdsSettings,
+  defaultAppearanceSettings,
   defaultSiteSettings,
   siteSettingsSchema,
 } from '@aimag/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { readSettings, writeSettings } from '../../db/settings.js';
-import { AuditLog, NewsletterSubscriber } from '../../models/index.js';
+import { AuditLog, Media, NewsletterSubscriber } from '../../models/index.js';
 import { revalidateWeb } from '../../scheduler/revalidate.js';
 import { audit } from '../audit.js';
 import { requirePermission } from '../middleware/auth.js';
@@ -118,6 +120,30 @@ export function adminMiscRouter() {
     await audit(req, 'settings.site_update');
     clearCache();
     void revalidateWeb({ extraTags: ['settings'] });
+    res.json(value);
+  });
+
+  r.get('/settings/appearance', requirePermission('appearance.manage'), async (_req, res) => {
+    res.json(await readSettings('appearance', appearanceSettingsSchema, defaultAppearanceSettings));
+  });
+
+  r.put('/settings/appearance', requirePermission('appearance.manage'), async (req, res) => {
+    const value = parse(appearanceSettingsSchema, req.body);
+    const ids = [
+      value.branding.logoMediaId,
+      value.branding.logoDarkMediaId,
+      value.branding.faviconMediaId,
+    ].filter(Boolean);
+    if (ids.length && (await Media.countDocuments({ _id: { $in: ids } })) !== new Set(ids).size) {
+      throw new HttpError(400, 'one of the chosen images no longer exists');
+    }
+    await writeSettings('appearance', value);
+    await audit(req, 'settings.appearance_update', undefined, {
+      theme: value.theme,
+      name: value.branding.name,
+    });
+    clearCache();
+    void revalidateWeb({ extraTags: ['settings', 'categories'] });
     res.json(value);
   });
 

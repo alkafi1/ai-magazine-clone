@@ -9,7 +9,8 @@ import { JsonLd } from '@/components/JsonLd';
 import { ShareButtons } from '@/components/ShareButtons';
 import { SourceAttribution } from '@/components/SourceAttribution';
 import { ViewBeacon } from '@/components/ViewBeacon';
-import { getArticle, getRelated } from '@/lib/api';
+import { Markdown } from '@/components/Markdown';
+import { getArticle, getBranding, getRelated } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { newsArticleLd } from '@/lib/jsonld';
 
@@ -48,7 +49,8 @@ export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
   const a = await getArticle(slug);
   if (!a) notFound();
-  const related = await getRelated(slug).catch(() => []);
+  const [related, branding] = await Promise.all([getRelated(slug).catch(() => []), getBranding()]);
+  const original = a.kind === 'original';
 
   const crumbs = [
     { name: 'Home', path: '/' },
@@ -58,7 +60,7 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <JsonLd data={newsArticleLd(a)} />
+      <JsonLd data={newsArticleLd(a, branding)} />
       <ViewBeacon slug={a.slug} />
       <div className="mx-auto max-w-3xl">
         <Breadcrumbs items={crumbs} />
@@ -78,7 +80,7 @@ export default async function ArticlePage({ params }: Props) {
             <p className="text-sm text-slate">
               {a.author && (
                 <>
-                  Reported by{' '}
+                  {original ? 'By' : 'Reported by'}{' '}
                   <Link
                     href={`/author/${a.author.slug}`}
                     className="font-semibold text-ink hover:underline"
@@ -106,9 +108,16 @@ export default async function ArticlePage({ params }: Props) {
           </figure>
           <Ad slot="articleTop" className="mt-6" />
           <p className="mt-6 font-display text-xl leading-relaxed text-ink">{a.excerpt}</p>
-          <div className="mt-8">
-            <SourceAttribution url={a.sourceUrl} author={a.author?.name} />
-          </div>
+          {original && a.body && (
+            <div className="mt-8">
+              <Markdown>{a.body}</Markdown>
+            </div>
+          )}
+          {!original && a.sourceUrl && (
+            <div className="mt-8">
+              <SourceAttribution url={a.sourceUrl} author={a.author?.name} />
+            </div>
+          )}
           <Ad slot="articleBottom" className="mt-6" />
           {a.tags.length > 0 && (
             <ul className="mt-6 flex flex-wrap gap-2" aria-label="Tags">

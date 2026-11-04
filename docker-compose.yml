@@ -35,6 +35,7 @@ services:
       API_PORT: 4000
       # Public URL of the site (browser origin) and the internal address of the web container.
       SITE_URL: ${SITE_URL:-http://localhost:8080}
+      PUBLIC_API_URL: ${SITE_URL:-http://localhost:8080} # uploaded images are served from /api/media on the same origin
       CORS_ORIGINS: ${SITE_URL:-http://localhost:8080}
       WEB_URL: http://web:3100
       TRUST_PROXY_HOPS: 1 # nginx in front

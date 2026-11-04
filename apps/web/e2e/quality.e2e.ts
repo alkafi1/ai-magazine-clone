@@ -30,6 +30,12 @@ const ADMIN_PAGES = [
   '/admin/ads',
   '/admin/settings',
   '/admin/users',
+  '/admin/roles',
+  '/admin/categories',
+  '/admin/pages',
+  '/admin/media',
+  '/admin/appearance',
+  '/admin/articles/new',
   '/admin/audit',
   '/admin/account',
 ];

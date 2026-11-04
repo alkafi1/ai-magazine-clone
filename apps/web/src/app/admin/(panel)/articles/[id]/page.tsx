@@ -12,8 +12,21 @@ import {
 } from '@/components/admin/ui';
 import { AdminApiError, adminApi, can, guard } from '@/lib/admin';
 import { saveSeo } from '../../../actions';
+import {
+  ArticleEditor,
+  DeleteArticleForm,
+  type EditableArticle,
+  type MediaItem,
+} from '@/components/admin/ArticleEditor';
 
 type Article = {
+  kind?: 'scraped' | 'original';
+  body?: string;
+  categoryId?: string;
+  tags?: string[];
+  coverMediaId?: string | null;
+  coverUrl?: string | null;
+  imageAlt?: string;
   id: string;
   title: string;
   slug: string;
@@ -24,6 +37,7 @@ type Article = {
   scrapedAt: string;
   sourceUrl: string;
   isHidden: boolean;
+  status: string;
   isFeatured: boolean;
   viewCount: number;
   seo: {
@@ -50,6 +64,65 @@ export default async function EditArticle({
     throw e;
   });
   const editable = can(me, 'articles.seo');
+
+  if (a.kind === 'original') {
+    const canWrite = can(me, 'articles.write');
+    const [cats, media] = await Promise.all([
+      adminApi<{ items: { id: string; name: string }[] }>('/categories'),
+      can(me, 'media.manage')
+        ? adminApi<{ items: MediaItem[] }>('/media').catch(() => ({ items: [] }))
+        : Promise.resolve({ items: [] as MediaItem[] }),
+    ]);
+    const editableArticle: EditableArticle = {
+      id: a.id,
+      title: a.title,
+      slug: a.slug,
+      excerpt: a.excerpt,
+      body: a.body ?? '',
+      categoryId: a.categoryId ?? '',
+      tags: a.tags ?? [],
+      status: a.status,
+      publishedAt: a.publishedAt,
+      isFeatured: a.isFeatured,
+      coverMediaId: a.coverMediaId ?? null,
+      coverUrl: a.coverUrl ?? null,
+      imageAlt: a.imageAlt ?? '',
+      seo: a.seo,
+      author: a.author,
+    };
+    return (
+      <>
+        <Link
+          href="/admin/articles"
+          className="text-sm font-semibold text-wire-dark hover:underline"
+        >
+          ← All articles
+        </Link>
+        <div className="mt-2" />
+        <PageHeader
+          title={a.title}
+          description={`Original article · ${a.category ?? 'no category'} · ${a.viewCount} views`}
+          actions={canWrite && <DeleteArticleForm id={a.id} />}
+        />
+        <Flash ok={sp.ok} err={sp.err} />
+        {canWrite ? (
+          <ArticleEditor
+            article={editableArticle}
+            categories={cats.items}
+            media={media.items}
+            me={me}
+            canFeature={can(me, 'articles.feature')}
+          />
+        ) : (
+          <Card title="Read only">
+            <p className="text-sm text-slate-600">
+              You can view this article but not edit it (it needs the “write articles” permission).
+            </p>
+          </Card>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

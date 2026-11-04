@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { safeHttpsUrl } from '@/lib/site';
+import { safeImageUrl } from '@/lib/site';
 
 /**
  * Article picture. Default: hotlinked straight from the source (IMAGE_OPTIMIZE unset) — the browser
@@ -25,7 +25,7 @@ export function Cover({
   width?: number;
   sizes?: string;
 }) {
-  const safeSrc = safeHttpsUrl(src);
+  const safeSrc = safeImageUrl(src);
   if (!safeSrc) {
     return (
       <div

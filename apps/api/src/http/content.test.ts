@@ -404,3 +404,114 @@ describe('media', () => {
     expect(await Media.countDocuments()).toBe(1);
   });
 });
+
+describe('appearance: branding, theme, navigation', () => {
+  const get = async (t: string) =>
+    (await request(app).get('/api/admin/settings/appearance').set(as(t)).expect(200)).body;
+  const put = (t: string, body: object) =>
+    request(app).put('/api/admin/settings/appearance').set(as(t)).send(body);
+
+  it('saves branding with an uploaded logo and exposes it, the theme and the menu publicly', async () => {
+    const logo = await request(app)
+      .post('/api/admin/media')
+      .set(as(sup))
+      .set('Content-Type', 'image/png')
+      .set('x-filename', 'logo.png')
+      .send(PNG)
+      .expect(201);
+    const a = await get(sup);
+    expect(a.theme).toBe('synthwire'); // default
+    const next = {
+      ...a,
+      theme: 'broadsheet',
+      branding: {
+        ...a.branding,
+        name: 'Daily Circuit',
+        tagline: 'Our own tagline',
+        logoMediaId: logo.body.id,
+        showName: false,
+      },
+      navigation: {
+        header: {
+          mode: 'custom',
+          items: [
+            { label: 'Home', href: '/' },
+            { label: 'Partner', href: 'https://partner.example/x' },
+          ],
+        },
+        footer: [{ label: 'Team', href: '/p/our-team' }],
+      },
+    };
+    await put(sup, next).expect(200);
+    clearCache();
+    const pub = (await request(app).get('/api/site-config')).body;
+    expect(pub.theme).toBe('broadsheet');
+    expect(pub.branding).toMatchObject({
+      name: 'Daily Circuit',
+      tagline: 'Our own tagline',
+      showName: false,
+      logoUrl: `${config.publicApiUrl}/api/media/${logo.body.id}`,
+      faviconUrl: '',
+    });
+    expect(pub.navigation.header.items).toHaveLength(2);
+    expect(pub.navigation.footer).toEqual([{ label: 'Team', href: '/p/our-team' }]);
+    await request(app).delete(`/api/admin/media/${logo.body.id}`).set(as(sup)).expect(409); // the logo is in use
+  });
+
+  it('rejects bad values', async () => {
+    const a = await get(sup);
+    expect((await put(sup, { ...a, theme: 'neon' })).status).toBe(400);
+    expect((await put(sup, { ...a, branding: { ...a.branding, name: '' } })).status).toBe(400);
+    expect(
+      (await put(sup, { ...a, branding: { ...a.branding, contactEmail: 'nope' } })).status,
+    ).toBe(400);
+    expect(
+      (
+        await put(sup, {
+          ...a,
+          branding: { ...a.branding, logoMediaId: '000000000000000000000000' },
+        })
+      ).status,
+    ).toBe(400); // no such image
+    for (const href of [
+      'javascript:alert(1)',
+      '//evil.example',
+      'http://insecure.example',
+      'data:text/html,x',
+    ]) {
+      const bad = {
+        ...a,
+        navigation: { header: { mode: 'custom', items: [{ label: 'X', href }] }, footer: [] },
+      };
+      expect((await put(sup, bad)).status, href).toBe(400);
+    }
+    expect(
+      (
+        await put(sup, {
+          ...a,
+          navigation: {
+            header: { mode: 'custom', items: Array(13).fill({ label: 'X', href: '/' }) },
+            footer: [],
+          },
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it('needs appearance.manage (editors cannot restyle the site)', async () => {
+    await request(app)
+      .get('/api/admin/settings/appearance')
+      .set(as(await tokenFor('editor@t.test')))
+      .expect(403);
+    await Role.create({
+      key: 'designer',
+      name: 'Designer',
+      permissions: ['dashboard.view', 'appearance.manage', 'media.manage'],
+      rank: 30,
+    });
+    await AdminUser.create({ email: 'd@t.test', role: 'designer', passwordHash: hash });
+    const d = await tokenFor('d@t.test');
+    await put(d, await get(d)).expect(200);
+    await request(app).get('/api/admin/settings/site').set(as(d)).expect(403); // but not the other settings
+  });
+});

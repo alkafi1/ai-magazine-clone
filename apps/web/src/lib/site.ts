@@ -19,4 +19,19 @@ export function safeHttpsUrl(url: string | null | undefined): string | null {
   }
 }
 
+/** For <img src>: https anywhere; plain http only for local development (e.g. the dev API's uploads). */
+export function safeImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:') return url;
+    // http is only tolerated for localhost (a local test stack serving its own uploads); it can only
+    // work on the visitor's own machine, so it is harmless in production.
+    if (u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname)) return url;
+  } catch {
+    /* not a URL */
+  }
+  return null;
+}
+
 export const abs = (path: string) => `${SITE.url}${path.startsWith('/') ? path : `/${path}`}`;

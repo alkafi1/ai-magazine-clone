@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { PublicConfig } from '@aimag/shared';
 
 const tones = {
-  info: 'bg-wire text-white',
+  info: 'bg-wire text-on-wire',
   success: 'bg-emerald-600 text-white',
   warning: 'bg-signal text-night',
   breaking: 'bg-red-600 text-white',

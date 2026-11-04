@@ -324,12 +324,12 @@ export function adminContentRouter() {
   });
   const refreshPage = (slug: string) => {
     clearCache();
-    void revalidateWeb({ extraTags: ['settings', `page:${slug}`] });
+    void revalidateWeb({ extraTags: ['home', 'settings', `page:${slug}`] }); // 'home' also refreshes the sitemap
   };
 
   r.get('/pages', requirePermission('pages.manage'), async (_req, res) => {
     const pages = await Page.find().sort({ title: 1 });
-    res.json({ items: pages.map((p) => ({ ...pageView(p), body: undefined })) });
+    res.json({ items: pages.map((p) => pageView(p)) });
   });
   r.get('/pages/:id', requirePermission('pages.manage'), async (req, res) => {
     const p = await Page.findById(parse(objectId, req.params.id));

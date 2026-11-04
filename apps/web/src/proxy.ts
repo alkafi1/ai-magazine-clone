@@ -45,7 +45,8 @@ async function contentSecurityPolicy(): Promise<string> {
   const cfg = await siteCfg();
   const script = ["'self'", "'unsafe-inline'"];
   const connect = ["'self'", API_ORIGIN];
-  const img = ["'self'", 'data:', 'https://assets.bizclikmedia.net'];
+  // our own uploads (logo, covers) are served by the API
+  const img = ["'self'", 'data:', 'https://assets.bizclikmedia.net', API_ORIGIN];
   const frame: string[] = [];
   if (cfg?.ads.enabled) {
     if (cfg.ads.provider === 'adsense') {

@@ -1,4 +1,4 @@
-import { SITE, abs } from './site';
+import { abs } from './site';
 import type { Article } from './types';
 import { esc, xml } from './xml';
 
@@ -18,4 +18,3 @@ export function rssResponse(opts: {
     `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>${esc(opts.title)}</title><link>${esc(abs(opts.linkPath))}</link><description>${esc(opts.description)}</description><language>en</language><atom:link href="${esc(abs(opts.selfPath))}" rel="self" type="application/rss+xml"/>${rows.join('')}</channel></rss>`,
   );
 }
-void SITE;

@@ -1,23 +1,25 @@
 import { SITE, abs } from './site';
 import type { Article } from './types';
 
-const publisher = {
-  '@type': 'Organization',
-  name: SITE.name,
-  url: SITE.url,
-  logo: { '@type': 'ImageObject', url: abs('/icon.svg') },
-};
+import type { Branding } from './api';
 
-export const organizationLd = () => ({
+const publisher = (b: Pick<Branding, 'name' | 'logoUrl'>) => ({
+  '@type': 'Organization',
+  name: b.name,
+  url: SITE.url,
+  logo: { '@type': 'ImageObject', url: b.logoUrl || abs('/icon.svg') },
+});
+
+export const organizationLd = (b: Branding) => ({
   '@context': 'https://schema.org',
-  ...publisher,
+  ...publisher(b),
   sameAs: [],
 });
 
-export const websiteLd = () => ({
+export const websiteLd = (b: Branding) => ({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
-  name: SITE.name,
+  name: b.name,
   url: SITE.url,
   potentialAction: {
     '@type': 'SearchAction',
@@ -37,8 +39,8 @@ export const breadcrumbLd = (items: { name: string; path: string }[]) => ({
   })),
 });
 
-/** NewsArticle for our curated page; isBasedOn points at the original reporting. */
-export const newsArticleLd = (a: Article) => ({
+/** NewsArticle. Aggregated stories carry isBasedOn (the original reporting); our own articles do not. */
+export const newsArticleLd = (a: Article, b: Branding) => ({
   '@context': 'https://schema.org',
   '@type': 'NewsArticle',
   headline: a.title.slice(0, 110),
@@ -54,10 +56,14 @@ export const newsArticleLd = (a: Article) => ({
   author: a.author
     ? { '@type': 'Person', name: a.author.name, url: abs(`/author/${a.author.slug}`) }
     : undefined,
-  publisher,
-  isBasedOn: {
-    '@type': 'NewsArticle',
-    url: a.sourceUrl,
-    publisher: { '@type': 'Organization', name: SITE.sourceName, url: SITE.sourceUrl },
-  },
+  publisher: publisher(b),
+  ...(a.kind === 'scraped' && a.sourceUrl
+    ? {
+        isBasedOn: {
+          '@type': 'NewsArticle',
+          url: a.sourceUrl,
+          publisher: { '@type': 'Organization', name: SITE.sourceName, url: SITE.sourceUrl },
+        },
+      }
+    : {}),
 });

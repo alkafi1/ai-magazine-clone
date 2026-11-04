@@ -82,16 +82,57 @@ export const getSitemapNews = async () =>
     )
   )?.items ?? [];
 export const getSitemapPages = () =>
-  get<{ categories: string[]; tags: string[]; authors: string[] }>('/api/sitemap/pages', ['home']);
+  get<{ categories: string[]; tags: string[]; authors: string[]; pages: string[] }>(
+    '/api/sitemap/pages',
+    ['home'],
+  );
 
-/** Admin-controlled settings (announcement, ads, analytics, social, flags). Falls back to safe defaults if the API is down. */
+const defaultConfig = () => toPublicConfig(defaultSiteSettings(), defaultAdsSettings());
+
+/** Fill in anything missing (older cached response, API on an older version) so the site never crashes on it. */
+function withDefaults(raw: Partial<PublicConfig> | null): PublicConfig {
+  const d = defaultConfig();
+  if (!raw) return d;
+  return {
+    ...d,
+    ...raw,
+    branding: { ...d.branding, ...raw.branding },
+    navigation: {
+      ...d.navigation,
+      ...raw.navigation,
+      header: { ...d.navigation.header, ...raw.navigation?.header },
+    },
+    features: { ...d.features, ...raw.features },
+    ads: { ...d.ads, ...raw.ads },
+    social: { ...d.social, ...raw.social },
+  };
+}
+
+/** Admin-controlled settings (announcement, ads, analytics, social, flags, branding, theme, menus). Falls back to safe defaults. */
 export async function getSiteConfig(): Promise<PublicConfig> {
   try {
-    return (
-      (await get<PublicConfig>('/api/site-config', ['settings'], 60)) ??
-      toPublicConfig(defaultSiteSettings(), defaultAdsSettings())
-    );
+    return withDefaults(await get<PublicConfig>('/api/site-config', ['settings'], 60));
   } catch {
-    return toPublicConfig(defaultSiteSettings(), defaultAdsSettings());
+    return defaultConfig();
   }
 }
+
+export type Branding = PublicConfig['branding'];
+
+/** Site name, tagline, logo etc. from the admin Appearance settings (cached; safe defaults if the API is down). */
+export async function getBranding(): Promise<Branding> {
+  const b = (await getSiteConfig()).branding;
+  return {
+    ...b,
+    contactEmail: b.contactEmail || process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'editor@example.com',
+  };
+}
+
+export type CustomPage = {
+  slug: string;
+  title: string;
+  body: string;
+  seo: { metaTitle: string | null; metaDescription: string | null; noindex: boolean };
+  updatedAt: string;
+};
+export const getPage = (slug: string) => get<CustomPage>(`/api/pages/${slug}`, [`page:${slug}`]);

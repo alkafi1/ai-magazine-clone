@@ -9,9 +9,25 @@ test.describe('menus and pages follow the role', () => {
     await loginOk(page, 'editor@e2e.test');
     const nav = await names(page);
     expect(nav).toEqual(
-      expect.arrayContaining(['Dashboard', 'Articles', 'Scrape runs', 'My account']),
+      expect.arrayContaining([
+        'Dashboard',
+        'Articles',
+        'Categories',
+        'Media',
+        'Scrape runs',
+        'My account',
+      ]),
     );
-    for (const hidden of ['Users & roles', 'Audit log', 'Ads', 'Site settings', 'Subscribers'])
+    for (const hidden of [
+      'Users',
+      'Roles',
+      'Audit log',
+      'Ads',
+      'Site settings',
+      'Subscribers',
+      'Appearance',
+      'Pages',
+    ])
       expect(nav).not.toContain(hidden);
 
     await page.goto('/admin/articles?q=drug');
@@ -75,14 +91,19 @@ test.describe('user management (serial: shares one new account)', () => {
   test.describe.configure({ mode: 'serial' });
   const email = 'newhire@e2e.test';
 
-  test('a super admin creates an account; it can sign in', async ({ page, browser }) => {
+  test('a super admin creates an account (in a modal); it can sign in', async ({
+    page,
+    browser,
+  }) => {
     await loginOk(page);
     await page.goto('/admin/users');
-    await page.fill('#new-email', email);
-    await page.fill('#new-name', 'New Hire');
-    await page.selectOption('#new-role', 'viewer');
-    await page.fill('#new-password', 'first-password-1234');
-    await page.getByRole('button', { name: 'Create account' }).click();
+    await page.getByRole('button', { name: 'Add user' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a user' });
+    await dialog.getByLabel('Email').fill(email);
+    await dialog.getByLabel('Name').fill('New Hire');
+    await dialog.getByLabel('Role').selectOption('viewer');
+    await dialog.getByLabel('Temporary password').fill('first-password-1234');
+    await dialog.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByRole('status')).toContainText(`Account created for ${email}`);
     await expect(page.locator('tbody tr', { hasText: email })).toContainText('Viewer');
 
@@ -93,10 +114,21 @@ test.describe('user management (serial: shares one new account)', () => {
     await ctx.close();
   });
 
-  test('changing the role applies to the open session immediately; admins cannot create peers', async ({
-    page,
-    browser,
-  }) => {
+  test('a failed create re-opens the modal with the error beside the input', async ({ page }) => {
+    await loginOk(page);
+    await page.goto('/admin/users');
+    await page.getByRole('button', { name: 'Add user' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a user' });
+    await dialog.getByLabel('Email').fill(email); // already exists
+    await dialog.getByLabel('Temporary password').fill('another-password-1234');
+    await dialog.getByRole('button', { name: 'Create account' }).click();
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'an account with that email exists' }),
+    ).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Add a user' })).toBeVisible(); // modal came back open
+  });
+
+  test('changing the role applies to the open session immediately', async ({ page, browser }) => {
     const ctx = await browser.newContext({ baseURL: 'http://localhost:3110' });
     const hire = await ctx.newPage();
     await login(hire, email, 'first-password-1234');
@@ -104,10 +136,13 @@ test.describe('user management (serial: shares one new account)', () => {
 
     await loginOk(page);
     await page.goto('/admin/users');
-    const row = page.locator('tbody tr', { hasText: email });
-    await row.locator('summary').click();
-    await row.locator('select[name=role]').selectOption('editor');
-    await row.getByRole('button', { name: 'Change role' }).click();
+    await page
+      .locator('tbody tr', { hasText: email })
+      .getByRole('button', { name: 'Manage' })
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'New Hire' });
+    await dialog.locator('select[name=role]').selectOption('editor');
+    await dialog.getByRole('button', { name: 'Change role' }).click();
     await expect(page.getByRole('status')).toContainText('Account updated');
 
     await hire.goto('/admin/articles'); // old session: its token version is stale
@@ -124,16 +159,17 @@ test.describe('user management (serial: shares one new account)', () => {
   }) => {
     await loginOk(page);
     await page.goto('/admin/users');
-    // Each action redirects back with a flash message; wait for it before the next step, so we never
-    // click into the page that is about to be replaced.
+    // Each action redirects back with a flash message; wait for it before the next step.
     const manage = async () => {
-      const row = page.locator('tbody tr', { hasText: email });
-      await row.locator('summary').click();
-      return row;
+      await page
+        .locator('tbody tr', { hasText: email })
+        .getByRole('button', { name: 'Manage' })
+        .click();
+      return page.getByRole('dialog', { name: 'New Hire' });
     };
 
-    let row = await manage();
-    await row.getByRole('button', { name: 'Disable' }).click();
+    let dialog = await manage();
+    await dialog.getByRole('button', { name: 'Disable account' }).click();
     await expect(page.getByRole('status')).toContainText('Account updated');
     await expect(page.locator('tbody tr', { hasText: email }).getByText('Disabled')).toBeVisible();
 
@@ -142,22 +178,25 @@ test.describe('user management (serial: shares one new account)', () => {
     await login(p, email, 'first-password-1234');
     await expect(p).toHaveURL(/error=1/);
 
-    row = await manage();
-    await row.getByRole('button', { name: 'Enable' }).click();
+    dialog = await manage();
+    await dialog.getByRole('button', { name: 'Enable account' }).click();
     await expect(page.getByRole('status')).toContainText('Account updated');
     await expect(page.locator('tbody tr', { hasText: email }).getByText('Active')).toBeVisible();
 
-    row = await manage();
-    await row.locator('input[name=password]').fill('reset-password-5678');
-    await row.getByRole('button', { name: 'Reset password' }).click();
+    dialog = await manage();
+    await dialog.getByLabel('Set a new password').fill('reset-password-5678');
+    await dialog.getByRole('button', { name: 'Reset password' }).click();
     await expect(page.getByRole('status')).toContainText('Password reset');
     await login(p, email, 'reset-password-5678');
     await expect(p.getByRole('navigation', { name: 'Admin' })).toBeVisible();
     await ctx.close();
 
-    row = await manage();
-    await row.getByRole('button', { name: 'Delete account' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+    dialog = await manage();
+    await dialog.getByRole('button', { name: 'Delete account' }).click();
+    await page
+      .getByRole('dialog', { name: /^Delete .*\?$/ })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
     await expect(page.getByRole('status')).toContainText('Account deleted');
     await expect(page.locator('tbody tr', { hasText: email })).toHaveCount(0);
   });
@@ -190,8 +229,8 @@ test('lockout: five wrong passwords lock the account, an admin can unlock it', a
   await page.goto('/admin/users');
   const row = page.locator('tbody tr', { hasText: 'lockme@e2e.test' });
   await expect(row.getByText('Locked')).toBeVisible();
-  await row.locator('summary').click();
-  await row.getByRole('button', { name: 'Unlock' }).click();
+  await row.getByRole('button', { name: 'Manage' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByRole('status')).toContainText('Account updated');
   await login(p, 'lockme@e2e.test', PASSWORD);
   await expect(p.getByRole('navigation', { name: 'Admin' })).toBeVisible();

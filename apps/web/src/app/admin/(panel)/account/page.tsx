@@ -1,4 +1,3 @@
-import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@aimag/shared';
 import { Badge, Card, Field, Flash, PageHeader, button, inputCls } from '@/components/admin/ui';
 import { getMe } from '@/lib/admin';
 import { changePassword, updateProfile } from '../../actions';
@@ -15,7 +14,7 @@ export default async function Account({
       <PageHeader
         title="My account"
         description={me.email}
-        actions={<Badge tone="violet">{ROLE_LABELS[me.role]}</Badge>}
+        actions={<Badge tone="violet">{me.roleName}</Badge>}
       />
       <Flash ok={sp.ok} err={sp.err} />
       <div className="grid gap-6 lg:grid-cols-2">
@@ -33,8 +32,8 @@ export default async function Account({
             <button className={button('primary')}>Save</button>
           </form>
           <p className="mt-5 text-sm text-slate-600">
-            <strong className="text-slate-900">{ROLE_LABELS[me.role]}.</strong>{' '}
-            {ROLE_DESCRIPTIONS[me.role]}
+            <strong className="text-slate-900">{me.roleName}.</strong> Your permissions come from
+            this role. Ask an admin if you need more.
           </p>
         </Card>
         <Card

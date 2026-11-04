@@ -131,6 +131,13 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST https://example.com/api/revalid
   (<https://search.google.com/test/rich-results>) on a few article URLs.
 - Ask a friend to try a taken-down story: hide an article in the admin, then `curl -I` its URL: **410**.
 
+## 7a. Write content, brand and theme the site
+
+Everything is in `/admin` and needs no redeploy: **Appearance** (logo, name, theme, menus), **Articles → New article**
+(your own writing, with drafts and scheduling), **Categories**, **Pages**, **Media**, **Roles**. Uploaded images live in
+MongoDB, so `scripts/backup-mongo.sh` already covers them. Set `PUBLIC_API_URL` to your site URL (the compose file does)
+so uploaded logo/cover URLs point at your domain.
+
 ## 7b. Ads and analytics (YOU, optional)
 
 1. Create an AdSense account and get the site approved (<https://adsense.google.com>); this needs real content and a live

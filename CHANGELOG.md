@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Admin v3: custom roles (permission picker, rank, escalation guard), modals, own articles (markdown, draft/scheduled), category/page/media CRUD, logo/branding/menus, 3 themes; fixes: UTC date parsing, localhost image URLs, sitemap pages, mongo nofile limit, duplicate dialog ids.
 - Admin v2: RBAC (6 roles, 14 permissions), user management, audit log, lockout, bulk actions; ads (AdSense/custom) with consent, GA4, announcement bar, dark mode, topics, per-category RSS, ads.txt; dynamic CSP; site-wide quality crawl (a11y + links); fixes: server-to-server rate-limit exemption, dark-mode contrast, keyboard-accessible tables.
 - Phase 8: Dockerfiles (API, web), full `docker compose up` stack with nginx, TLS override, CI workflow, backup/restore scripts, deployment guide; resilient discovery (computed month URLs + homepage fallback, zero-URL runs fail); true HTTP 410 for taken-down stories.
 - Phase 7: security hardening, selector-break detection (run warnings + alert), query-plan review with 3 new indexes.
