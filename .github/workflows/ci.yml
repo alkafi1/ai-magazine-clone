@@ -43,7 +43,7 @@ jobs:
         run: pnpm --filter @aimag/web exec playwright install --with-deps chromium
       - name: 'E2E (isolated stack - test DB, API on 4010, production web build on 3110)'
         run: pnpm e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-traces
