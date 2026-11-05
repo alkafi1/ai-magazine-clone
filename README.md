@@ -1,227 +1,266 @@
-# AI Magazine Clone
+# Synthwire: an AI news site and magazine CMS
 
-An AI news site (Next.js + Express + MongoDB) with its own design and brand. Headlines are aggregated
-from [aimagazine.com](https://aimagazine.com) by a polite scraper that runs every 6 hours.
-See [PLAN.md](PLAN.md) for scope, database design, SEO and API plans.
+[![CI](https://github.com/alkafi1/ai-magazine-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/alkafi1/ai-magazine-clone/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Content rules (never broken)
+A full-stack news site built with **Next.js, Express and MongoDB**. It does two things:
 
-- Only title, short excerpt (<= 200 chars), thumbnail URL, category, author name, publish date and the
-  canonical source URL are stored. **Full article bodies are never stored or shown.**
-- robots.txt is enforced in code before every fetch (no `?` URLs, no disallowed paths).
-- Crawl: custom User-Agent, 1.5-2s delay, concurrency 1, exponential backoff, stop on repeated 403/429.
+1. **Aggregates AI headlines** from a source site every 6 hours (headline, short excerpt, picture link, category,
+   author, date, and a link back). It never copies full article text.
+2. Is a small **magazine CMS**: write your own articles, make categories and pages, change the logo, menus and
+   theme, run ads, and manage a team with roles, all from an admin panel with no redeploy.
 
-## Layout
+The default brand is "Synthwire" and the default source is [aimagazine.com](https://aimagazine.com). Both are
+configurable. See [Legal and ethics](#legal-and-ethics) before pointing it at any site.
 
+> Planning notes: [PLAN.md](PLAN.md) (original scope, data model, SEO plan). Going live: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Contents
+
+[Features](#features) · [Architecture](#architecture) · [Quick start](#quick-start) · [Configuration](#configuration) ·
+[Admin, roles and content](#admin-roles-and-content) · [Themes](#themes) · [Ads, consent and analytics](#ads-consent-and-analytics) ·
+[SEO](#seo) · [Scraper](#scraper) · [API](#api) · [Testing](#testing) · [Security](#security) · [Operations](#operations) ·
+[Project layout](#project-layout) · [Legal and ethics](#legal-and-ethics) · [License](#license)
+
+## Features
+
+**Public site**
+
+- Server-rendered with ISR plus on-demand revalidation; home, latest, categories, topics, tags, authors, search, article
+  pages, custom pages, RSS (site and per category), dark mode, announcement bar, newsletter sign-up.
+- **3 themes**, switchable from the admin: _Synthwire_ (editorial), _Broadsheet_ (newspaper), _Midnight_ (dark tech).
+- Accessible (axe WCAG 2 A/AA checks run on every page, every theme, light and dark) and fast (Lighthouse 94 to 99
+  with the image optimizer on).
+
+**Admin panel** (`/admin`)
+
+- Dashboard with charts and scraper health; article moderation with **bulk actions**; write **original articles**
+  (markdown, preview, drafts, scheduling, cover images); categories; pages; media library.
+- **RBAC**: 6 built-in roles plus **custom roles** with a permission picker, ranks and a privilege-escalation guard;
+  account lockout, immediate session invalidation, **audit log**.
+- **Ads** (Google AdSense or any network) with a consent banner, GA4, `ads.txt`, and a Content-Security-Policy that follows
+  your settings.
+- Branding: logo, favicon, name, tagline, menus, theme. Create/edit forms open in modals.
+
+**Content pipeline**
+
+- Polite crawler: obeys robots.txt, 1.5 to 2 s between requests, one request at a time, backoff, stops on repeated 403/429.
+- Per-run report in the admin: what was new, updated or failed, with warnings when the source's markup changes.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    SRC[Source site<br/>sitemap + article pages]
+    subgraph API["apps/api (Express + Mongoose)"]
+      SCH[Scheduler<br/>every 6h, lock, retry, alerts]
+      SCR[Scraper<br/>robots, sitemap, NEXT_DATA parser]
+      REST[Public + admin REST API]
+    end
+    DB[(MongoDB)]
+    subgraph WEB["apps/web (Next.js 16)"]
+      PAGES[SSR / ISR pages + SEO]
+      ADM[Admin panel]
+    end
+    NGX[nginx]
+    U[Visitors / search engines]
+    A[Admins]
+
+    SCH --> SCR -->|polite crawl| SRC
+    SCR --> DB
+    REST --- DB
+    PAGES -->|fetch| REST
+    ADM -->|JWT in httpOnly cookie| REST
+    REST -->|revalidate tags| PAGES
+    U --> NGX --> PAGES
+    A --> NGX --> ADM
+    NGX -->|/api/*| REST
 ```
-apps/api       Express API, scraper, scheduler
-apps/web       Next.js 16 frontend (App Router, Tailwind 4)
-packages/shared  zod schemas and types shared by both
-```
+
+| Layer    | Choice                                                              |
+| -------- | ------------------------------------------------------------------- |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4, TypeScript       |
+| API      | Node.js 22, Express 5, TypeScript, zod 4, pino                      |
+| Database | MongoDB 7 with Mongoose                                             |
+| Auth     | JWT (HS256) + bcrypt, httpOnly SameSite=Strict cookie for the admin |
+| Tests    | Vitest, Supertest, Playwright, axe-core                             |
+| Delivery | pnpm workspaces, Docker Compose, nginx, GitHub Actions              |
 
 ## Quick start
+
+Requires Docker. For local development also Node 20+ and pnpm.
 
 ### Run everything in Docker (production-like)
 
 ```bash
-cp .env.example .env     # set JWT_SECRET, REVALIDATE_SECRET (32+ chars), SCRAPER_CONTACT_EMAIL; remove the COMPOSE_FILE line
+cp .env.example .env     # set JWT_SECRET, REVALIDATE_SECRET (32+ random chars) and SCRAPER_CONTACT_EMAIL;
+                         # delete the COMPOSE_FILE line
 docker compose up -d --build
 docker compose exec api node dist/db/create-admin.js you@example.com 'a-long-password'
-docker compose exec api node dist/scraper/run-cli.js --limit 20      # first articles (the 6-hourly schedule is already on)
-open http://localhost:8080          # site;  /admin = admin panel
+docker compose exec api node dist/scraper/run-cli.js --limit 20      # first articles (6-hourly schedule is already on)
+open http://localhost:8080                                           # the site; /admin is the admin panel
 ```
 
-Services: `mongo`, `api` (Express + scraper + scheduler), `web` (Next.js), `nginx` (the only published port). To take it
-live (domain, HTTPS, backups, Search Console): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+Generate a secret with `openssl rand -base64 48 | tr -d '\n=/+' | head -c 48`. Services: `mongo`, `api`, `web`, `nginx`
+(the only published port). HTTPS: `docker-compose.tls.yml` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 
 ### Develop locally
 
-Requires Node >= 20, pnpm, Docker (for MongoDB only).
-
 ```bash
 pnpm install
-cp .env.example .env     # keeps COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml, which publishes Mongo on :27017
+cp .env.example .env     # keeps COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml (publishes Mongo on :27017)
 docker compose up -d mongo
 pnpm --filter @aimag/shared build
-pnpm --filter @aimag/api dev          # API + scheduler on :4000
+pnpm --filter @aimag/api dev          # API and scheduler on :4000
 pnpm --filter @aimag/web dev          # site on :3100
+pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'
 ```
 
-## Scripts
+| Command                                                  | What it does                                                                                                                      |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                                              | Unit and API tests (needs MongoDB)                                                                                                |
+| `pnpm e2e`                                               | Playwright against an isolated stack (own DB, own ports). First time: `pnpm --filter @aimag/web exec playwright install chromium` |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format`           | Quality checks (also run on staged files by the pre-commit hook)                                                                  |
+| `pnpm scrape:once --limit 20`                            | Dry run: scrape and print, no database                                                                                            |
+| `pnpm --filter @aimag/api scrape --limit 30 [--refresh]` | Real run into MongoDB                                                                                                             |
+| `pnpm --filter @aimag/api backfill 2026-01`              | Import every month since a given month                                                                                            |
+| `pnpm --filter @aimag/api db:explain`                    | Query-plan review on ~30k synthetic articles                                                                                      |
+| `./scripts/backup-mongo.sh` / `restore-mongo.sh`         | Compressed dump with rotation, and restore                                                                                        |
 
-| Command                        | What it does                                                   |
-| ------------------------------ | -------------------------------------------------------------- |
-| `pnpm lint` / `pnpm format`    | ESLint / Prettier                                              |
-| `pnpm typecheck` / `pnpm test` | Type-check / run tests in all packages                         |
-| `pnpm scrape:once --limit 20`  | Scrape up to 20 new articles and print them (no DB)            |
-| `./scripts/backup-mongo.sh`    | Compressed DB dump with rotation (`restore-mongo.sh` restores) |
+## Configuration
 
-## Environment variables
+Everything is configured through environment variables, validated with zod at start-up
+(`apps/api/src/config`). See [.env.example](.env.example) for the full list. The important ones:
 
-See [.env.example](.env.example); all are validated with zod in `apps/api/src/config`.
+| Variable                                   | Purpose                                                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`, `REVALIDATE_SECRET`          | Random strings, 32+ characters. **The API refuses to start in production with weak or default values.** |
+| `SITE_URL`                                 | Public URL of the site (baked into the web build: rebuild after changing)                               |
+| `SCRAPER_BASE_URL`, `SCRAPER_SECTIONS`     | Source site and which sections to import (default `news,articles`)                                      |
+| `SCRAPER_CONTACT_EMAIL`                    | Shown to the source site in the crawler's User-Agent. Use a real, monitored address                     |
+| `SCHEDULER_ENABLED`, `SCHEDULER_CRON`      | The 6-hourly run (default `0 */6 * * *`)                                                                |
+| `ALERT_WEBHOOK_URL`                        | Optional Slack/Discord/other webhook for failures and "source format changed" alerts                    |
+| `IMAGE_MODE`, `IMAGE_OPTIMIZE`             | Hotlink source images or let Next cache resized WebP copies (see [Legal](#legal-and-ethics))            |
+| `TRUST_PROXY_HOPS`, `LOGIN_RATE_LIMIT_MAX` | Reverse-proxy depth and sign-in attempts per IP per 15 min                                              |
 
-## Web app (Synthwire)
+## Admin, roles and content
 
-Brand: **Synthwire** — ink navy `#0c1222`, warm paper `#faf8f3`, violet `#5b3df5` accent, amber `#ffb703` highlight;
-Fraunces (headlines) + Inter (text); own wire-pulse logo. Change the name in `apps/web/src/lib/site.ts`.
+Sign in at `/admin`. Create the first account with `create-admin` (a **super admin**); add everyone else under Users.
 
-```bash
-pnpm --filter @aimag/api dev        # API on :4000 (also runs the scheduler)
-pnpm --filter @aimag/web dev        # site on :3100
-pnpm --filter @aimag/web build && pnpm --filter @aimag/web start
-```
+| Area                     | What it does                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| Dashboard                | KPIs, stories-per-day chart, scraper health, "attention needed" alerts             |
+| Articles                 | Search/filter, bulk feature/hide/restore, takedown, SEO overrides, **New article** |
+| Categories, Pages, Media | Content structure, custom pages (`/p/<slug>`), image library                       |
+| Scrape runs              | History, per-run details (new / updated / failed), warnings, **Run now**           |
+| Appearance               | Logo, name, tagline, favicon, header and footer menus, **theme**                   |
+| Ads, Site settings       | Ad network and placements, announcement bar, social links, GA4, feature toggles    |
+| Users, Roles, Audit log  | Accounts, custom roles, who did what and when                                      |
 
-- Pages: `/`, `/latest`, `/category/:slug`, `/tag/:slug`, `/author/:slug` (all paginated as `/page/2`), `/article/:slug`,
-  `/search` (noindex), `/about`, `/contact`, `/privacy`, `/terms`, `/dmca`, 404.
-- Rendering: ISR (`revalidate` 120s home, 300s elsewhere) plus on-demand `POST /api/revalidate` (secret header),
-  called by the API after each scrape. Tags: `home`, `category:<slug>`, `article:<slug>`, `categories`, `latest`.
-- SEO: `generateMetadata` on every page, canonical URLs, OG/Twitter tags with a generated branded card at
-  `/og/<slug>` (we never re-share the source's picture), JSON-LD `Organization`, `WebSite`+`SearchAction`,
-  `NewsArticle` (with `isBasedOn` = original URL) and `BreadcrumbList`, `/sitemap.xml` (index) ->
-  `/sitemaps/pages.xml`, `/sitemaps/articles/N.xml` (1000 per file), `/news-sitemap.xml` (last 48h), `/robots.txt`,
-  own RSS at `/feed.xml`.
-- Removed/unknown stories render the 404 page (App Router pages cannot send 410; the API does return 410 and
-  Nginx can map it in Phase 8).
-- Client JS is limited to the newsletter form and a view beacon; the menu uses `<details>`.
+**Two kinds of article.** _Aggregated_ stories hold only headline, short excerpt, picture link, category, author, date
+and the source URL; the API never returns a body for them, whatever is in the database (tested). _Original_ articles
+are written in the admin (markdown), have their own full page, and no source box.
 
-### Admin panel
+**Roles.** Permissions, not role names, are checked everywhere (`packages/shared/src/rbac.ts`); the API enforces them and
+the UI only hides what you cannot use.
 
-`http://localhost:3100/admin`. Create the first account (a **super admin**) with
-`pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'`; add everyone else from **Users & roles**.
+| Role        | Can do                                              |
+| ----------- | --------------------------------------------------- |
+| Super admin | Everything, including managing other super admins   |
+| Admin       | Everything except managing super admins             |
+| Editor      | Write and feature articles, edit SEO, upload images |
+| Moderator   | Hide, restore and take down stories                 |
+| Ad manager  | Dashboard and ads                                   |
+| Viewer      | Read-only                                           |
+| _Custom_    | Any set of the 20 permissions at a rank you choose  |
 
-| Area          | What it does                                                                                          |
-| ------------- | ----------------------------------------------------------------------------------------------------- |
-| Dashboard     | KPIs, stories-per-day chart, scrape-run health strip, "attention needed" alerts                       |
-| Articles      | Search/filter, **bulk** feature/hide/restore, takedown (with confirmation), per-article SEO overrides |
-| Scrape runs   | History, errors, source-format warnings, **Run now**                                                  |
-| Subscribers   | Search, delete, **CSV export** (formula-injection safe, audited)                                      |
-| Ads           | AdSense or any network, 5 placements, consent, `ads.txt`, CSP hosts                                   |
-| Site settings | Announcement bar, social links, GA4, feature toggles, footer note                                     |
-| Users & roles | Create / change role / disable / unlock / reset password / delete; permission matrix                  |
-| Audit log     | Who did what, when, from which IP (sign-ins, user and settings changes, exports, takedowns)           |
-| My account    | Display name, change password (signs out other sessions)                                              |
+You can only grant permissions you hold, only at a rank below your own, and only manage accounts ranked below you.
+Role, password and disable changes take effect on the user's very next request; five wrong passwords lock an
+account for 15 minutes.
 
-**Roles (RBAC).** Permissions, not role names, are checked everywhere (`packages/shared/src/rbac.ts`); the API enforces them
-and the UI only hides what you cannot use.
+## Themes
 
-| Role        | Can do                                                          |
-| ----------- | --------------------------------------------------------------- |
-| Super admin | Everything, incl. managing other super admins                   |
-| Admin       | Everything except managing super admins; can create lower roles |
-| Editor      | Feature stories, edit SEO, view runs                            |
-| Moderator   | Hide / restore / take down stories, view runs                   |
-| Ad manager  | Dashboard + Ads                                                 |
-| Viewer      | Read-only dashboard, articles, runs                             |
+Switch the whole public site in Admin → Appearance: **Synthwire** (default), **Broadsheet** (cream paper, red accent,
+serif type, centred masthead, square corners), **Midnight** (dark-first, cyan accent, glowing cards). A theme is a block
+of CSS variables in `apps/web/src/app/globals.css` (`html[data-theme='…']`). To add one, copy a block and add its name to
+`THEMES` in `packages/shared/src/settings.ts`.
 
-Rules: you can only create/edit accounts **below** your own role and hand out roles below yours; you cannot change your own
-role or disable/delete yourself; a super admin always exists. Role, disable and password changes take effect on the user's
-**very next request** (the token is checked against the database every time). 5 wrong passwords lock an account for
-15 minutes (silently: same generic error, no account enumeration); an admin can unlock it. Everything is in the audit log.
-Sign-in stores the JWT in an `httpOnly`, `SameSite=Strict` cookie scoped to `/admin` (12 h). Behind a reverse proxy, make it
-set `X-Forwarded-For` to the real client IP so rate limits are per visitor.
+## Ads, consent and analytics
 
-### Write your own content, brand it, theme it
+Admin → Ads: choose Google AdSense (publisher ID and slot IDs) or paste another network's code, enable the placements
+(header, in-feed, sidebar, article top/bottom). Ads and GA4 load **only after the visitor accepts** the cookie banner;
+`/ads.txt` is generated from your settings; the CSP allows exactly the hosts you enable. The built-in banner is basic:
+Google requires a certified consent platform for personalised ads to EU/UK/CH visitors. You need your own AdSense account.
 
-Everything below is done in the admin, with no redeploy, and respects RBAC (each area has its own permission).
+## SEO
 
-- **Your own articles** (Articles → _New article_): title, summary, **markdown body** with a toolbar and live preview, category,
-  tags, byline, cover image (upload, library or URL), SEO overrides, and **draft / published / scheduled** (a
-  once-a-minute job publishes scheduled posts on time). Original articles are marked as ours: full text on our own page,
-  **no source box**, `NewsArticle` JSON-LD without `isBasedOn`, searchable by body text. Aggregated stories keep their
-  hard rule: **only headline + short excerpt + image link, never a body** (enforced in the API serializer and tested,
-  even if a body were somehow in the database).
-- **Categories** (create, rename, reorder, hide from the menu, SEO; deleting one that holds stories is refused).
-- **Pages** (About us, a team page…): markdown, published/draft, at `/p/<slug>`. A page with slug `about`, `contact`,
-  `privacy`, `terms` or `dmca` **replaces** that built-in page.
-- **Media library**: PNG/JPEG/WebP/SVG up to 2 MB, content-sniffed (a fake image or an SVG with scripts is refused),
-  stored in MongoDB (so backups include it) and served immutably from `/api/media/<id>` with a sandboxing CSP.
-- **Appearance**: site **name, tagline, logo** (plus a dark-background logo and favicon), **header and footer menus**
-  (automatic, or your own links), and the **theme**.
-- **Themes** (switch the whole public site; visitors can still toggle dark mode): **Synthwire** (default, editorial violet),
-  **Broadsheet** (newspaper: cream paper, black ink, red accent, serif type, centred masthead with a double rule, square corners)
-  and **Midnight** (dark-first tech look: navy, electric cyan, geometric headlines, glowing cards). Every theme passes the
-  automated WCAG 2 A/AA checks in light and dark. Themes are CSS-variable sets in `apps/web/src/app/globals.css`
-  (`html[data-theme=…]`); add a fourth by copying a block and adding its name to `THEMES` in `packages/shared/src/settings.ts`.
-- **Custom roles** (Roles → _New role_): choose a name, a **rank** and any permissions. You can only grant permissions you hold
-  yourself and ranks below your own, and can only manage accounts ranked below you, so a custom role can never be used to escalate.
-  Role edits take effect on the next request; a role in use cannot be deleted. Create/edit forms open in **modals** and
-  re-open with the error beside your input if the save fails.
+`generateMetadata` and canonical URLs on every page; Open Graph and Twitter cards with a generated branded image
+(`/og/<slug>`); JSON-LD `NewsArticle`, `BreadcrumbList`, `Organization`, `WebSite`+`SearchAction`; sitemap index with paginated
+article sitemaps and a news sitemap; robots.txt; RSS; clean pagination paths; real HTTP **410** for taken-down stories.
 
-### Ads, consent and analytics
+## Scraper
 
-Admin → **Ads**: turn ads on, choose **Google AdSense** (publisher ID `ca-pub-…` + ad-unit slot IDs) or **other network**
-(paste its ad code), then enable the placements you want: header banner, in-feed (every N stories), sidebar, article top,
-article bottom. Optional **Auto ads**. Other networks' domains go in "Allowed ad domains" and are added to the
-Content-Security-Policy at request time; Google's are added automatically. `/ads.txt` is generated from your publisher ID and any extra lines.
-
-- Ads and GA4 load **only after the visitor accepts** the cookie banner (default; "Ask for consent first"). Decline = no ad or
-  analytics scripts at all; a footer "Cookie settings" link lets people change their mind. Ads never render in the admin.
-- The built-in banner is basic. Google requires a **certified consent platform** for personalised ads to EU/UK/CH visitors:
-  add one before targeting those regions, or leave AdSense on non-personalised ads in your AdSense account.
-- You need your own AdSense account and an approved site: that is outside this repo.
-- Ad slots render nothing on the server (cached pages never depend on consent) and appear after hydration, so the first
-  paint has no ad space reserved. Pasted "other network" code runs in visitors' browsers: only use networks you trust
-  (only users with the Ads permission can set it).
-
-### Other site features
-
-Dark mode (toggle in the header, saved in the browser, no flash), announcement bar (breaking/notice/info, optional expiry),
-`/topics` index, an RSS feed **per category** (`/category/<slug>/feed.xml`), copy-link on articles, social links and footer
-note, and a switch to hide the newsletter form. All are controlled from the admin without a redeploy.
-
-### Images and Lighthouse (decision needed)
-
-By default (`IMAGE_OPTIMIZE` unset) story pictures are **hotlinked** from the source CDN, using its small variants
-(322px for cards, 668px for hero/article). The source serves PNGs, so heavy stories cost performance:
-Lighthouse mobile in this mode scored 76-95 performance depending on the story (accessibility, best practices
-and SEO are 98-100 everywhere). With `IMAGE_OPTIMIZE=true` (set at **build and run** time) Next resizes and converts
-to WebP and caches those derivatives on our server: **home 94, article 99, category 96**. That means we store
-resized copies of source images, so it is off until you decide it is acceptable.
+Discovery reads the source's monthly article sitemaps (computed from the date because the source's index omits them),
+falls back to the homepage's latest stories, then reads each page's embedded `__NEXT_DATA__`, then JSON-LD, then meta tags.
+A run finding zero URLs fails and alerts; falling back to weaker parsers is flagged as a warning, so a source redesign is
+noticed early. Upserts are idempotent (unique `sourceUrl`, change detection by `sourceHash`); slugs are made unique by a
+URL-derived suffix; scheduled runs use a Mongo lock, retries with backoff, and shut down gracefully.
 
 ## API
 
-`pnpm --filter @aimag/api dev` serves on `API_PORT` (4000). Create the first admin with
-`pnpm --filter @aimag/api create-admin you@example.com 'a-long-password'` (min 12 chars).
+REST under `/api`, validated with zod, cached, rate limited, with a CORS allow-list and helmet.
+Public: `GET /articles`, `/articles/:slug`, `/home`, `/categories`, `/tags`, `/authors/:slug`, `/pages/:slug`, `/search`, `/trending`, `/site-config`, `POST /newsletter` …
+Admin (`Authorization: Bearer <jwt>`): `/admin/articles`, `/categories`, `/pages`, `/media`, `/users`, `/roles`, `/settings/*`,
+`/scrape-runs`, `/audit`, `/stats`. Responses and error shapes are covered by the Supertest suite.
 
-Public (cached 60-300s, `Cache-Control` set for CDN/Nginx): `GET /api/articles` (`category`, `tag`, `author`, `page`,
-`limit`, `sort=latest|popular`), `/api/articles/:slug` (404 unknown, **410 taken down**), `/:slug/related`,
-`POST /:slug/view`, `/api/home`, `/api/categories`, `/api/tags`, `/api/authors/:slug`, `/api/search?q=`,
-`/api/trending`, `POST /api/newsletter` (5/hour/IP), `POST /api/revalidate` (header `x-revalidate-secret`).
+## Testing
 
-Admin (`Authorization: Bearer <jwt>`, 12h): `POST /api/admin/login` (10 tries/15 min/IP), `GET|PATCH|DELETE
-/api/admin/articles[/:id]`, `GET|POST /api/admin/scrape-runs`, `GET /api/admin/stats`. `DELETE` is a **takedown**
-(hidden + 410), not a hard delete, so the scraper does not re-import the article. Changes are written to `AuditLog`.
+| Suite                          | Count | What                                                                                                                    |
+| ------------------------------ | ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| API / unit (Vitest, Supertest) | ~150  | RBAC matrix, custom roles, content, scraper parsers, pipeline, security                                                 |
+| Web unit                       | 7     | URL/paging helpers, JSON-LD                                                                                             |
+| End-to-end (Playwright)        | 75    | Public flows, admin flows, roles, themes, **axe accessibility matrix** (3 themes x light/dark), site-wide quality crawl |
 
-Cross-cutting: zod validation on every input, helmet, CORS allowlist (`CORS_ORIGINS`), global rate limit
-(300/min/IP), central JSON error handler, pino logs. The cache is in-memory per process and cleared on admin edits.
+GitHub Actions ([ci.yml](.github/workflows/ci.yml)) runs format, lint, typecheck, unit tests, E2E, `pnpm audit` and the Docker builds.
 
-## Scheduler
+## Security
 
-`pnpm --filter @aimag/api dev` (or `start` after build) runs the API and the scheduler in one process.
+Input validated with zod everywhere; operator injection ignored; only `https` URLs stored; the scraper refuses other hosts
+and redirects; uploads are content-sniffed and served with a sandboxing CSP; admin session in an httpOnly SameSite=Strict cookie;
+helmet, per-request CSP, rate limits (public, login, newsletter), audit log, CSV-export formula-injection protection;
+production refuses weak secrets. Report vulnerabilities privately (see [SECURITY.md](SECURITY.md)).
 
-- Cron `SCHEDULER_CRON` (default `0 */6 * * *`); disable with `SCHEDULER_ENABLED=false`.
-- Overlap lock lives in MongoDB (`SiteSetting` key `lock:scrape`, 1h expiry), so a second trigger is skipped.
-- A run with status `failed` is retried (`SCHEDULER_RETRIES`, doubling delay). A `blocked` run is never retried.
-- On failure or block an alert is logged and POSTed to `ALERT_WEBHOOK_URL` (Slack/Discord-style `text` field).
-- After a run that changed anything, the API calls `POST {WEB_URL}/api/revalidate` with header
-  `x-revalidate-secret` (tags: `home`, `category:<slug>`, `article:<slug>`). Failures are only logged.
-- SIGINT/SIGTERM stops the cron, lets any running scrape (cron or admin button) finish its current page, records it as `partial`, releases the lock and exits.
-- On startup, runs still marked `running` past the 30-minute lock lifetime (a crashed process) are closed out as `failed`.
-- Manual run: `POST /api/admin/scrape-runs` with an admin JWT (returns 202), or the admin panel button (Phase 6).
-- The web app defaults to port 3100 because 3000 is commonly taken.
+## Operations
 
-## Data model notes
+Docker Compose stack with healthchecks and log rotation; nginx with security headers and a TLS override; MongoDB backup and
+restore scripts; Dependabot; weekly CI audit. MongoDB needs a high open-files limit (the compose file sets it).
+Details, the go-live checklist and troubleshooting: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-- Upsert key is `sourceUrl`; an article is only rewritten when `sourceHash` changes. Admin-controlled fields
-  (`isFeatured`, `isHidden`, `seo`, `slug`) are never overwritten by the scraper.
-- Only the sections in `SCRAPER_SECTIONS` (default `news,articles`) are imported; the source sitemap also
-  lists `/events/` and `/press-releases/` pages, which are excluded.
-- Source pages expose no modified date, and the sitemap has no `lastmod`, so a known URL is not re-fetched.
-- Tests in `src/db` need MongoDB (`docker compose up -d mongo`); they use the `aimag_test` database
-  (override with `MONGODB_URI_TEST`).
-- The compose mongo service runs as the `mongodb` user: the default entrypoint's `gosu` step hung on this host.
+## Project layout
 
-## Defaults chosen
+```
+apps/api         Express API, scraper, scheduler, publisher, models, tests
+apps/web         Next.js frontend and admin panel, Playwright E2E
+packages/shared  zod schemas, RBAC definitions and settings shared by both
+nginx/           reverse-proxy configs (HTTP and TLS template)
+scripts/         Mongo backup and restore
+docs/            DEPLOYMENT.md
+```
 
-- Package manager pnpm; tests with Vitest; logging with pino; validation with zod.
-- `IMAGE_MODE=hotlink` uses source image URLs directly; `placeholder` disables them.
+## Legal and ethics
+
+This project **aggregates headlines** from a third-party publisher. Before running it against any site you do not own:
+
+- Ask the publisher for permission. Their robots.txt allowing crawling is not a licence.
+- Keep to the defaults: short excerpt, picture link, attribution and a link to the original on every story; never copy bodies.
+- Use a real `SCRAPER_CONTACT_EMAIL` so the publisher can reach you, and keep the crawl rate low.
+- `IMAGE_OPTIMIZE=true` makes your server cache resized copies of their images; leave it off unless you have permission.
+- Provide a working takedown route (the DMCA page and the admin takedown action are built in).
+
+This project is not affiliated with, endorsed by or sponsored by aimagazine.com or BizClik. Search engines may treat a site
+of headlines and summaries as thin content; the original articles, categories and pages you add are what make it worth indexing.
+Check the name "Synthwire" for trademark conflicts before using it publicly, or change it in Admin → Appearance.
+
+## License
+
+[MIT](LICENSE). The licence covers the code, not the content of any site it aggregates.
