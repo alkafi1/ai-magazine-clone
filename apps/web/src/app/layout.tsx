@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Fraunces, Inter, Playfair_Display, Source_Serif_4, Space_Grotesk } from 'next/font/google';
 import { getSiteConfig } from '@/lib/api';
 import { SITE, safeImageUrl } from '@/lib/site';
+import { PwaRegister } from '@/components/PwaRegister';
 import './globals.css';
 
 // Fonts are declared for every theme but only downloaded when a page actually uses them (preload is off for
@@ -39,6 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: `${b.name} — ${b.tagline}`, template: `%s | ${b.name}` },
     description: b.description,
     applicationName: b.name,
+    manifest: '/manifest.webmanifest',
     alternates: { types: { 'application/rss+xml': `${SITE.url}/feed.xml` } },
     openGraph: { siteName: b.name, type: 'website', locale: 'en_GB' },
     twitter: { card: 'summary_large_image' },
@@ -53,7 +55,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const safeTheme = (THEMES as readonly string[]).includes(theme) ? theme : 'synthwire';
   return (
     <html lang="en" suppressHydrationWarning data-theme={safeTheme} className={fontVars}>
-      <body>{children}</body>
+      <body>
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

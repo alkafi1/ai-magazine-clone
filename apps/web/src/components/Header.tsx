@@ -31,6 +31,9 @@ export async function Header() {
       <Link href="/latest" className={navLink}>
         Latest
       </Link>
+      <Link href="/saved" className={navLink}>
+        Saved
+      </Link>
       {primary.map((c) => (
         <Link key={c.slug} href={`/category/${c.slug}`} className={navLink}>
           {c.name}
@@ -87,6 +90,11 @@ export async function Header() {
               <li>
                 <Link href="/latest" className={`${navLink} block`}>
                   Latest
+                </Link>
+              </li>
+              <li>
+                <Link href="/saved" className={`${navLink} block`}>
+                  Saved
                 </Link>
               </li>
               {categories.map((c) => (

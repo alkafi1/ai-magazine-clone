@@ -28,6 +28,7 @@ configurable. See [Legal and ethics](#legal-and-ethics) before pointing it at an
 
 - Server-rendered with ISR plus on-demand revalidation; home, latest, categories, topics, tags, authors, search, article
   pages, custom pages, RSS (site and per category), dark mode, announcement bar, newsletter sign-up.
+- **Reader experience**: Reading progress bar, adjustable text size, text-to-speech audio reader, article bookmarking / saved articles, local comments, and PWA offline support with web manifest.
 - **3 themes**, switchable from the admin: _Synthwire_ (editorial), _Broadsheet_ (newspaper), _Midnight_ (dark tech).
 - Accessible (axe WCAG 2 A/AA checks run on every page, every theme, light and dark) and fast (Lighthouse 94 to 99
   with the image optimizer on).

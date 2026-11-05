@@ -7,6 +7,10 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Cover } from '@/components/Cover';
 import { JsonLd } from '@/components/JsonLd';
 import { ShareButtons } from '@/components/ShareButtons';
+import { BookmarkButton } from '@/components/BookmarkButton';
+import { ReadingProgress } from '@/components/ReadingProgress';
+import { ReadingSettings } from '@/components/ReadingSettings';
+import { Comments } from '@/components/Comments';
 import { SourceAttribution } from '@/components/SourceAttribution';
 import { ViewBeacon } from '@/components/ViewBeacon';
 import { Markdown } from '@/components/Markdown';
@@ -60,6 +64,7 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
+      <ReadingProgress />
       <JsonLd data={newsArticleLd(a, branding)} />
       <ViewBeacon slug={a.slug} />
       <div className="mx-auto max-w-3xl">
@@ -106,13 +111,19 @@ export default async function ArticlePage({ params }: Props) {
               <figcaption className="mt-2 text-xs text-slate">{a.imageAlt}</figcaption>
             )}
           </figure>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-y border-mist py-3">
+            <ReadingSettings />
+            <BookmarkButton slug={a.slug} title={a.title} />
+          </div>
           <Ad slot="articleTop" className="mt-6" />
-          <p className="mt-6 font-display text-xl leading-relaxed text-ink">{a.excerpt}</p>
-          {original && a.body && (
-            <div className="mt-8">
-              <Markdown>{a.body}</Markdown>
-            </div>
-          )}
+          <div id="article-body">
+            <p className="mt-6 font-display text-xl leading-relaxed text-ink">{a.excerpt}</p>
+            {original && a.body && (
+              <div className="mt-8">
+                <Markdown>{a.body}</Markdown>
+              </div>
+            )}
+          </div>
           {!original && a.sourceUrl && (
             <div className="mt-8">
               <SourceAttribution url={a.sourceUrl} author={a.author?.name} />
@@ -136,6 +147,7 @@ export default async function ArticlePage({ params }: Props) {
           <div className="mt-6 border-t border-mist pt-4">
             <ShareButtons path={`/article/${a.slug}`} title={a.title} />
           </div>
+          <Comments slug={a.slug} />
         </article>
       </div>
 

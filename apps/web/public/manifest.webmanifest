@@ -1,0 +1,16 @@
+{
+  "name": "Synthwire",
+  "short_name": "Synthwire",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c1222",
+  "theme_color": "#0c1222",
+  "description": "AI news — headlines, expanded summaries and daily digest.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
