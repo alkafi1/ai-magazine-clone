@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build context: repository root.  docker build -f apps/web/Dockerfile -t synthwire-web .
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 RUN npm install -g pnpm@12.16.1
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -21,7 +21,7 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
     NEXT_BUILD_THREADS=1
 RUN pnpm --filter @aimag/web build
 
-FROM node:22-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3100 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
