@@ -17,6 +17,8 @@ const scrapeRunSchema = new Schema({
   durationMs: Number,
   // Source-format health warnings (see scraper/health.ts); empty when all is well.
   warnings: { type: [String], default: [] },
+  // Informational remarks that need no action (never alert).
+  notes: { type: [String], default: [] },
   // What this run did, article by article (new, updated, failed); capped so one run cannot grow without limit.
   items: {
     type: [

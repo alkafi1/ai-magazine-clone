@@ -37,7 +37,11 @@ const article = (n: number, over: Partial<ScrapedArticle> = {}): ScrapedArticle 
   ...over,
 });
 const entries = (n: number) => Array.from({ length: n }, (_, i) => entry(i + 1));
-const found = (n: number, warnings: string[] = []) => ({ entries: entries(n), warnings });
+const found = (n: number, warnings: string[] = []) => ({
+  entries: entries(n),
+  warnings,
+  notes: [] as string[],
+});
 /** fetchArticle answering from a plain list, reporting which layer served it. */
 const serve = (via = 'next-data') =>
   fetchArticle.mockImplementation(async (_f, e) => ({
@@ -108,7 +112,11 @@ describe('runScrape', () => {
   });
 
   it('fails a run that finds zero URLs instead of reporting success', async () => {
-    discoverEntries.mockResolvedValue({ entries: [], warnings: ['no URLs from sitemaps'] });
+    discoverEntries.mockResolvedValue({
+      entries: [],
+      warnings: ['no URLs from sitemaps'],
+      notes: [],
+    });
     const s = await runScrape({ trigger: 'cron' });
     expect(s.status).toBe('failed');
     const err = await ScrapeError.findOne({ run: s.runId, stage: 'discover' }).lean();
@@ -178,6 +186,22 @@ describe('per-run details for the admin', () => {
       ['updated', 'story-1'],
       ['created', 'story-3'],
     ]);
+  });
+});
+
+describe('notes versus warnings', () => {
+  it('stores notes on the run without turning them into warnings', async () => {
+    discoverEntries.mockResolvedValue({
+      entries: entries(3),
+      warnings: [],
+      notes: ['index omits the monthly sitemaps'],
+    });
+    serve();
+    const s = await runScrape({ trigger: 'cron' });
+    expect(s.warnings).toEqual([]); // nothing for the alert hook to react to
+    const run = await ScrapeRun.findById(s.runId).lean();
+    expect(run?.notes).toEqual(['index omits the monthly sitemaps']);
+    expect(run?.warnings).toEqual([]);
   });
 });
 

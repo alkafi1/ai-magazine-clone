@@ -51,9 +51,23 @@ describe('discoverEntries', () => {
       ]),
       [`${B}/sitemap-articles-10-2026.xml`]: monthXml,
     });
-    const { entries, warnings } = await discoverEntries(fetcher, { months: 2 }, NOW);
+    const { entries, warnings, notes } = await discoverEntries(fetcher, { months: 2 }, NOW);
     expect(entries.length).toBe(2); // the fixture’s 3rd URL is in an excluded section
-    expect(warnings.join(' ')).toMatch(/lists no monthly article sitemaps/);
+    // The computed month URLs worked, so this is only worth a note: no warning, therefore no alert.
+    expect(warnings).toEqual([]);
+    expect(notes.join(' ')).toMatch(/does not list the monthly article sitemaps/);
+  });
+
+  it('warns (not just notes) when the index lists no months AND the computed months return nothing', async () => {
+    const { fetcher } = stub({
+      [`${B}/sitemap.xml`]: indexXml([]),
+      [`${B}/`]: homepage(['/news/a']),
+    });
+    const { entries, warnings, notes } = await discoverEntries(fetcher, { months: 2 }, NOW);
+    expect(entries.map((e) => e.loc)).toEqual([`${B}/news/a`]); // homepage fallback
+    expect(notes).toEqual([]);
+    expect(warnings.join(' ')).toMatch(/They returned nothing either/);
+    expect(warnings.join(' ')).toMatch(/fell back to the homepage/);
   });
 
   it('merges index-listed and computed months without duplicates, newest first', async () => {

@@ -70,7 +70,11 @@ export function parseHomepageLatest(html: string, baseUrl = config.scraper.baseU
   }
 }
 
-export type Discovery = { entries: SitemapUrl[]; warnings: string[] };
+/**
+ * `warnings`: something is wrong (alerts fire). `notes`: informational, e.g. the source's sitemap index omits
+ * the monthly sitemaps but the computed month URLs work fine, so nothing needs attention.
+ */
+export type Discovery = { entries: SitemapUrl[]; warnings: string[]; notes: string[] };
 
 /**
  * Find article URLs. Sources, in order:
@@ -85,6 +89,7 @@ export async function discoverEntries(
   now = new Date(),
 ): Promise<Discovery> {
   const warnings: string[] = [];
+  const notes: string[] = [];
   const base = config.scraper.baseUrl;
 
   let listed: string[] = [];
@@ -112,11 +117,7 @@ export async function discoverEntries(
   ]
     .filter((u) => monthKey(u) >= sinceKey)
     .sort((a, b) => (opts.since ? monthKey(a) - monthKey(b) : monthKey(b) - monthKey(a)));
-  if (!listed.some((u) => monthKey(u) > 0)) {
-    warnings.push(
-      'sitemap index lists no monthly article sitemaps; relying on computed month URLs',
-    );
-  }
+  const indexListsMonths = listed.some((u) => monthKey(u) > 0);
   logger.info({ candidates }, 'article sitemaps to read');
 
   const seen = new Set<string>();
@@ -139,6 +140,14 @@ export async function discoverEntries(
   }
 
   let usable = entries.filter((e) => inConfiguredSection(e.loc) && fetcher.isAllowed(e.loc));
+  // The source's index has been seen to omit its monthly article sitemaps although they exist. If the
+  // computed month URLs delivered stories that is harmless: note it, but do not raise an alert.
+  if (!indexListsMonths) {
+    const text =
+      'The source’s sitemap index does not list the monthly article sitemaps; the month URLs are computed instead.';
+    if (usable.length > 0) notes.push(text);
+    else warnings.push(`${text} They returned nothing either.`);
+  }
   if (usable.length === 0) {
     warnings.push(
       'no URLs from sitemaps; fell back to the homepage latest-stories list (only the newest few)',
@@ -152,7 +161,7 @@ export async function discoverEntries(
       warnings.push(`homepage fallback failed: ${err instanceof Error ? err.message : err}`);
     }
   }
-  return { entries: usable, warnings };
+  return { entries: usable, warnings, notes };
 }
 
 /** Fetch one article page and return its normalized shape. Throws StageError on bad data. */

@@ -441,6 +441,7 @@ export function adminRouter(opts: { loginMax: number }) {
       skipped: run.skipped,
       failed: run.failed,
       warnings: run.warnings ?? [],
+      notes: run.notes ?? [],
       legacy,
       truncated: run.created + run.updated + run.failed > items.length && !legacy,
       items: items.map((i) => ({ ...i, live: !!i.slug && liveSlugs.has(i.slug) })),

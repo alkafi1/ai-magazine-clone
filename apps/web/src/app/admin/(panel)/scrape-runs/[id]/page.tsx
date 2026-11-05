@@ -38,6 +38,7 @@ type Run = {
   skipped: number;
   failed: number;
   warnings: string[];
+  notes?: string[];
   legacy: boolean;
   truncated: boolean;
   items: Item[];
@@ -144,6 +145,20 @@ export default async function RunDetail({ params }: { params: Promise<{ id: stri
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {run.warnings.map((w) => (
               <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(run.notes ?? []).length > 0 && (
+        <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+          <p className="font-semibold">
+            Notes{' '}
+            <span className="font-normal text-sky-700">(for information, nothing to fix)</span>
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {(run.notes ?? []).map((n) => (
+              <li key={n}>{n}</li>
             ))}
           </ul>
         </div>

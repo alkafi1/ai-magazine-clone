@@ -57,6 +57,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
   };
   const stats = emptyStats();
   const discoveryWarnings: string[] = [];
+  const notes: string[] = [];
   type Item = {
     outcome: 'created' | 'updated' | 'failed';
     title?: string;
@@ -83,6 +84,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
     );
     const entries = discovery.entries;
     discoveryWarnings.push(...discovery.warnings);
+    notes.push(...discovery.notes);
     // A run that finds nothing must never look healthy: the source layout probably changed.
     if (entries.length === 0) {
       throw new Error(
@@ -183,6 +185,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
       skipped: s.skipped,
       failed: s.failed,
       warnings: s.warnings,
+      notes,
       items,
     },
   );
