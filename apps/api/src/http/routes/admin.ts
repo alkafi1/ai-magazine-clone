@@ -361,7 +361,7 @@ export function adminRouter(opts: { loginMax: number }) {
   r.get('/scrape-runs', requirePermission('scrape.view'), async (req, res) => {
     const q = parse(z.object({ page, limit }), req.query);
     const [runs, total] = await Promise.all([
-      ScrapeRun.find()
+      ScrapeRun.find({}, '-items')
         .sort({ startedAt: -1 })
         .skip((q.page - 1) * q.limit)
         .limit(q.limit)
@@ -381,6 +381,76 @@ export function adminRouter(opts: { loginMax: number }) {
       page: q.page,
       limit: q.limit,
       total,
+    });
+  });
+
+  // One run in detail: every article it added, updated or failed on, plus its errors and warnings.
+  r.get('/scrape-runs/:id', requirePermission('scrape.view'), async (req, res) => {
+    const id = parse(objectId, req.params.id);
+    const run = await ScrapeRun.findById(id).lean();
+    if (!run) throw new HttpError(404, 'not found');
+    const errors = await ScrapeError.find({ run: run._id }).sort({ at: 1 }).limit(200).lean();
+    type RunItem = {
+      outcome: 'created' | 'updated' | 'failed';
+      title?: string | null;
+      slug?: string | null;
+      url?: string | null;
+      category?: string | null;
+      stage?: string | null;
+      message?: string | null;
+    };
+    let items: RunItem[] = [...(run.items ?? [])];
+    let legacy = false;
+    if (items.length === 0 && run.created + run.updated > 0) {
+      // Runs from before per-article details were recorded: show the articles that run last touched.
+      legacy = true;
+      const touched = await Article.find({ lastRun: run._id }, 'title slug sourceUrl category')
+        .populate('category', 'name')
+        .limit(500)
+        .lean();
+      items = touched.map((a) => ({
+        outcome: 'created' as const,
+        title: a.title,
+        slug: a.slug,
+        url: a.sourceUrl ?? undefined,
+        category: (a.category as unknown as { name?: string })?.name,
+      }));
+    }
+    const liveSlugs = new Set(
+      (
+        await Article.find(
+          {
+            slug: { $in: items.map((i) => i.slug).filter(Boolean) as string[] },
+            isHidden: false,
+            status: 'published',
+          },
+          'slug',
+        ).lean()
+      ).map((a) => a.slug),
+    );
+    res.json({
+      id: String(run._id),
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt ?? null,
+      durationMs: run.durationMs ?? null,
+      trigger: run.trigger,
+      status: run.status,
+      urlsFound: run.urlsFound,
+      created: run.created,
+      updated: run.updated,
+      skipped: run.skipped,
+      failed: run.failed,
+      warnings: run.warnings ?? [],
+      legacy,
+      truncated: run.created + run.updated + run.failed > items.length && !legacy,
+      items: items.map((i) => ({ ...i, live: !!i.slug && liveSlugs.has(i.slug) })),
+      errors: errors.map((e) => ({
+        url: e.url,
+        stage: e.stage,
+        message: e.message,
+        httpStatus: e.httpStatus,
+        at: e.at,
+      })),
     });
   });
 

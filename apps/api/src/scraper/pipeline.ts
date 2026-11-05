@@ -1,10 +1,13 @@
 import type { Types } from 'mongoose';
-import { upsertArticle } from '../db/articles.js';
+import { upsertArticleDetailed } from '../db/articles.js';
 import { logger } from '../lib/logger.js';
 import { Article, ScrapeError, ScrapeRun } from '../models/index.js';
 import { BlockedError, FetchError } from './fetcher.js';
 import { assessHealth, emptyStats, recordParsed } from './health.js';
 import { createFetcher, discoverEntries, fetchArticle, StageError } from './run.js';
+
+/** Per-run detail kept for the admin; further articles are still counted, just not listed. */
+const MAX_ITEMS = 500;
 
 export type RunOptions = {
   trigger: 'cron' | 'manual' | 'cli' | 'backfill';
@@ -54,6 +57,17 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
   };
   const stats = emptyStats();
   const discoveryWarnings: string[] = [];
+  type Item = {
+    outcome: 'created' | 'updated' | 'failed';
+    title?: string;
+    slug?: string;
+    url?: string;
+    category?: string;
+    stage?: string;
+    message?: string;
+  };
+  const items: Item[] = [];
+  const addItem = (i: Item) => items.length < MAX_ITEMS && items.push(i);
   const logError = (e: {
     url?: string;
     stage: 'discover' | 'fetch' | 'parse' | 'normalize' | 'save';
@@ -100,17 +114,33 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
       try {
         const { article, via } = await fetchArticle(fetcher, entry);
         recordParsed(stats, article, via);
-        const outcome = await upsertArticle(article, run._id);
+        const { outcome, slug } = await upsertArticleDetailed(article, run._id);
         if (outcome === 'created') {
           s.created++;
-          s.newSlugs.push(article.slug);
+          s.newSlugs.push(slug); // the slug actually saved (it can differ from the title's slug)
           s.categorySlugs.push(article.category.slug);
         } else if (outcome === 'updated') s.updated++;
         else s.skipped++;
+        if (outcome !== 'unchanged') {
+          addItem({
+            outcome,
+            title: article.title,
+            slug,
+            url: entry.loc,
+            category: article.category.name,
+          });
+        }
       } catch (err) {
         s.failed++;
         if (err instanceof StageError) stats.parseFailed++;
         const message = err instanceof Error ? err.message : String(err);
+        addItem({
+          outcome: 'failed',
+          url: entry.loc,
+          stage:
+            err instanceof StageError ? err.stage : err instanceof FetchError ? 'fetch' : 'save',
+          message: message.slice(0, 300),
+        });
         await logError({
           url: entry.loc,
           stage:
@@ -153,6 +183,7 @@ export async function runScrape(opts: RunOptions): Promise<RunSummary> {
       skipped: s.skipped,
       failed: s.failed,
       warnings: s.warnings,
+      items,
     },
   );
   s.categorySlugs = [...new Set(s.categorySlugs)];

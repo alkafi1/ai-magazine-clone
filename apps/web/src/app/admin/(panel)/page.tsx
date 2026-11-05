@@ -22,6 +22,7 @@ type Stats = {
   totalViews: number;
   activeAdmins: number;
   lastRun: {
+    _id: string;
     startedAt: string;
     status: string;
     created: number;
@@ -134,12 +135,19 @@ export default async function Dashboard() {
             </dl>
           )}
           {can(me, 'scrape.view') && (
-            <Link
-              href="/admin/scrape-runs"
-              className="mt-4 inline-block text-sm font-semibold text-wire-dark hover:underline"
-            >
-              All runs →
-            </Link>
+            <div className="mt-4 flex gap-4 text-sm font-semibold">
+              {last && (
+                <Link
+                  href={`/admin/scrape-runs/${last._id}`}
+                  className="text-wire-dark hover:underline"
+                >
+                  What did it import? →
+                </Link>
+              )}
+              <Link href="/admin/scrape-runs" className="text-wire-dark hover:underline">
+                All runs →
+              </Link>
+            </div>
           )}
         </Card>
       </div>

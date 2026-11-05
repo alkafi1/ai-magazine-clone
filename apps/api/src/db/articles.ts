@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ScrapedArticle } from '@aimag/shared';
 import type { Types } from 'mongoose';
 import { Article, Author, Category } from '../models/index.js';
@@ -26,23 +27,34 @@ async function authorId(name: string | null): Promise<Types.ObjectId | undefined
   return doc._id;
 }
 
-/** Slug from the title; on collision with a different article append a short suffix. */
-async function uniqueSlug(base: string, sourceUrl: string, sourceSlug: string): Promise<string> {
-  const clash = await Article.findOne({ slug: base, sourceUrl: { $ne: sourceUrl } }, '_id').lean();
-  if (!clash) return base;
-  return `${base}-${slugify(sourceSlug).slice(-6) || Date.now().toString(36)}`;
+/**
+ * Slug from the title. If another article already has it (titles that share their first 80 characters,
+ * like "This week's top five stories in AI: week 1 / 2 / 3 October"), add a suffix derived from the
+ * source URL's hash: stable (the same URL always gets the same slug) and different for every URL.
+ */
+async function uniqueSlug(base: string, sourceUrl: string): Promise<string> {
+  const taken = async (slug: string) =>
+    !!(await Article.exists({ slug, sourceUrl: { $ne: sourceUrl } }));
+  if (!(await taken(base))) return base;
+  const hash = createHash('sha1').update(sourceUrl).digest('hex').slice(0, 6);
+  let candidate = `${base.slice(0, 72)}-${hash}`;
+  for (let i = 2; await taken(candidate); i++) candidate = `${base.slice(0, 68)}-${hash}-${i}`;
+  return candidate;
 }
+
+export type UpsertResult = { outcome: UpsertOutcome; slug: string };
 
 /**
  * Insert or update one article, keyed by sourceUrl. Only re-saves when sourceHash changed.
  * Admin-controlled fields (isFeatured, isHidden, seo, slug) are never overwritten on update.
  */
-export async function upsertArticle(
+export async function upsertArticleDetailed(
   a: ScrapedArticle,
   runId?: Types.ObjectId,
-): Promise<UpsertOutcome> {
-  const existing = await Article.findOne({ sourceUrl: a.sourceUrl }, 'sourceHash').lean();
-  if (existing && existing.sourceHash === a.sourceHash) return 'unchanged';
+): Promise<UpsertResult> {
+  const existing = await Article.findOne({ sourceUrl: a.sourceUrl }, 'sourceHash slug').lean();
+  if (existing && existing.sourceHash === a.sourceHash)
+    return { outcome: 'unchanged', slug: existing.slug };
 
   const [category, author] = await Promise.all([categoryId(a.category), authorId(a.authorName)]);
   const fields = {
@@ -63,9 +75,24 @@ export async function upsertArticle(
 
   if (existing) {
     await Article.updateOne({ sourceUrl: a.sourceUrl }, { $set: fields });
-    return 'updated';
+    return { outcome: 'updated', slug: existing.slug };
   }
-  const slug = await uniqueSlug(a.slug, a.sourceUrl, a.sourceSlug);
-  await Article.create({ ...fields, slug, sourceUrl: a.sourceUrl });
-  return 'created';
+  // Two articles being saved at the same moment could still pick the same slug: retry once with a new one.
+  for (let attempt = 0; ; attempt++) {
+    const slug = await uniqueSlug(attempt === 0 ? a.slug : `${a.slug}-${attempt + 1}`, a.sourceUrl);
+    try {
+      await Article.create({ ...fields, slug, sourceUrl: a.sourceUrl });
+      return { outcome: 'created', slug };
+    } catch (err) {
+      const e = err as { code?: number; message?: string };
+      if (e.code !== 11000 || !/slug/.test(e.message ?? '') || attempt >= 3) throw err;
+    }
+  }
+}
+
+export async function upsertArticle(
+  a: ScrapedArticle,
+  runId?: Types.ObjectId,
+): Promise<UpsertOutcome> {
+  return (await upsertArticleDetailed(a, runId)).outcome;
 }

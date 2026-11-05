@@ -62,17 +62,40 @@ describe('upsertArticle', () => {
     expect(a?.seo?.noindex).toBe(true);
   });
 
-  it('suffixes the slug on collision with a different source URL', async () => {
+  it('suffixes the slug on collision with a different source URL (stable per URL)', async () => {
     await upsertArticle(sample());
-    await upsertArticle(
-      sample({
-        sourceUrl: 'https://aimagazine.com/news/other-xyz123',
-        sourceSlug: 'other-xyz123',
-        sourceHash: 'h3',
-      }),
-    );
+    const other = sample({
+      sourceUrl: 'https://aimagazine.com/news/other-xyz123',
+      sourceSlug: 'other-xyz123',
+      sourceHash: 'h3',
+    });
+    await upsertArticle(other);
     const slugs = (await Article.find().lean()).map((a) => a.slug).sort();
-    expect(slugs).toEqual(['sample-title', 'sample-title-xyz123']);
+    expect(slugs[0]).toBe('sample-title');
+    expect(slugs[1]).toMatch(/^sample-title-[0-9a-f]{6}$/);
+    // re-saving the same story with changed content keeps its slug (URLs never change under readers)
+    await upsertArticle({ ...other, sourceHash: 'h4', title: 'Renamed' });
+    expect((await Article.find().lean()).map((a) => a.slug).sort()).toEqual(slugs);
+  });
+
+  it('gives different slugs to stories whose titles share their first 80 characters (the week 1/2/3 incident)', async () => {
+    const base =
+      'this-weeks-top-five-stories-in-ai-week-for-the-month-of-the-year-two-thousand-and-twenty-six';
+    const long = (n: number, over = {}) =>
+      sample({
+        title: `This week's top five stories in AI: week ${n} of the month of October`,
+        slug: base.slice(0, 80), // what the normalizer produces: identical for all three
+        sourceUrl: `https://aimagazine.com/news/this-weeks-top-five-stories-in-ai-week-${n}-october`,
+        sourceSlug: `this-weeks-top-five-stories-in-ai-week-${n}-october`, // same last 6 characters, too
+        sourceHash: `hash-${n}`,
+        ...over,
+      });
+    const results = [];
+    for (const n of [1, 2, 3]) results.push(await upsertArticle(long(n)));
+    expect(results).toEqual(['created', 'created', 'created']); // no E11000
+    const slugs = (await Article.find().lean()).map((a) => a.slug);
+    expect(new Set(slugs).size).toBe(3);
+    expect(slugs.every((x) => x.length <= 90)).toBe(true);
   });
 
   it('works without an author', async () => {

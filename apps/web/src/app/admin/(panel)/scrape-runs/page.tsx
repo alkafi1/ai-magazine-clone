@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import {
   Badge,
   Card,
@@ -116,6 +117,11 @@ export default async function RunsAdmin({
                     )}
                   </Td>
                   <Td>{r.durationMs ? `${Math.round(r.durationMs / 1000)}s` : '—'}</Td>
+                  <Td className="text-right">
+                    <Link href={`/admin/scrape-runs/${r.id}`} className={button('secondary', true)}>
+                      Details
+                    </Link>
+                  </Td>
                 </tr>
               ))}
             </tbody>

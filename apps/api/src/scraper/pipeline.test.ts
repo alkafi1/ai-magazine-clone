@@ -145,6 +145,42 @@ describe('runScrape', () => {
   });
 });
 
+describe('per-run details for the admin', () => {
+  it('records which articles were new, updated and failed, with the slug that was actually saved', async () => {
+    discoverEntries.mockResolvedValue(found(3));
+    fetchArticle.mockImplementation(async (_f, e) => {
+      if (e.loc === url(3)) throw new StageError('parse', 'no usable title/date in any layer');
+      return { article: article(Number(e.loc.split('-').pop())), via: 'next-data' };
+    });
+    const first = await runScrape({ trigger: 'cli' });
+    const run = await ScrapeRun.findById(first.runId).lean();
+    expect(run?.items.map((i) => [i.outcome, i.slug ?? i.url])).toEqual([
+      ['created', 'story-1'],
+      ['created', 'story-2'],
+      ['failed', url(3)],
+    ]);
+    expect(run?.items[2]).toMatchObject({
+      stage: 'parse',
+      message: expect.stringContaining('no usable title'),
+    });
+
+    // a second run: story 1 changed (updated), story 2 unchanged (not listed), story 3 now parses (created)
+    fetchArticle.mockImplementation(async (_f, e) => {
+      const n = Number(e.loc.split('-').pop());
+      return {
+        article: article(n, n === 1 ? { sourceHash: 'changed', title: 'Story 1 edited' } : {}),
+        via: 'next-data',
+      };
+    });
+    const second = await runScrape({ trigger: 'cli', refresh: true });
+    const items = (await ScrapeRun.findById(second.runId).lean())?.items ?? [];
+    expect(items.map((i) => [i.outcome, i.slug])).toEqual([
+      ['updated', 'story-1'],
+      ['created', 'story-3'],
+    ]);
+  });
+});
+
 describe('selector-break detection in a run', () => {
   it('stays quiet for a healthy source', async () => {
     discoverEntries.mockResolvedValue(found(6));
